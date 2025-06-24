@@ -10,6 +10,8 @@ CREATE TABLE Products (
     category ENUM('raw', 'semi', 'finished') NOT NULL,
     min_stock_threshold FLOAT DEFAULT NULL,
     location_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (subcategory_id) REFERENCES Subcategories(id) ON DELETE CASCADE,
     FOREIGN KEY (location_id) REFERENCES Locations(id) ON DELETE CASCADE
 )
@@ -24,4 +26,6 @@ export interface Product extends RowDataPacket {
   category: 'raw' | 'semi' | 'finished';
   min_stock_threshold: number | null;
   location_id: number;
+  created_at?: Date;
+  updated_at?: Date;
 }

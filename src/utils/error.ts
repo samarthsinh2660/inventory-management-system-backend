@@ -57,6 +57,15 @@ export const ERRORS = {
     VALIDATION_ERROR: new RequestError("Validation failed", 10008, 422),
     RESOURCE_NOT_FOUND: new RequestError("Resource not found", 10009, 404),
     DUPLICATE_RESOURCE: new RequestError("Resource already exists", 10010, 409),
+    RESOURCE_ALREADY_EXISTS: new RequestError("Resource already exists", 10010, 409),
+    
+    // User Management Errors (11xxx)
+    INVALID_ROLE: new RequestError("Invalid role value. Allowed values: 'master', 'employee'", 11001, 400),
+    INVALID_USER_OPERATION: new RequestError("Invalid operation on user account", 11002, 400),
+    CANNOT_DELETE_OWN_ACCOUNT: new RequestError("Cannot delete your own account", 11003, 403),
+    CANNOT_CHANGE_OWN_ROLE: new RequestError("Cannot change your own role", 11004, 403),
+    USERNAME_ALREADY_EXISTS: new RequestError("Username already exists", 11005, 409),
+    EMAIL_ALREADY_EXISTS: new RequestError("Email already exists", 11006, 409),
     
     // Authentication & Authorization Errors (2xxxx)
     NO_TOKEN_PROVIDED: new RequestError("No authentication token provided", 20001, 401),
@@ -68,6 +77,15 @@ export const ERRORS = {
     ADMIN_ONLY_ROUTE: new RequestError("Admin access required", 20007, 403),
     JWT_SECRET_NOT_CONFIGURED: new RequestError("JWT configuration error", 20008, 500),
     INSUFFICIENT_PERMISSIONS: new RequestError("Insufficient permissions", 20009, 403),
+    INVALID_CREDENTIALS: new RequestError("Invalid username or password", 20010, 401),
+    ACCOUNT_LOCKED: new RequestError("Account is locked. Please contact administrator", 20011, 403),
+    
+    // Product Management Errors (3xxxx) 
+    PRODUCT_NOT_FOUND: new RequestError("Product not found", 30001, 404),
+    INVALID_PRODUCT_DATA: new RequestError("Invalid product data", 30002, 400),
+    PRODUCT_CODE_EXISTS: new RequestError("Product code already exists", 30003, 409),
+    INVALID_FORMULA: new RequestError("Invalid product formula", 30004, 400),
+    INVENTORY_NOT_ENOUGH: new RequestError("Not enough inventory for operation", 30005, 400),
 };
 
     // Helper function to check if error is a RequestError

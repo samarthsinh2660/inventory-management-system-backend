@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import { connectToDatabase } from "./database/db.ts";
 import { limiter } from "./middleware/ratelimit.middleware.ts";
 import LoginRouter from "./routes/auth.route.ts";
+import UserRouter from "./routes/user.route.ts";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware.ts";
 
 async function start(){
@@ -38,6 +39,7 @@ app.get('/health', (req, res) => {
 
 //api routes
 app.use('/api/auth', LoginRouter);
+app.use('/api/users', UserRouter);
 
 //erros 
 app.use(notFoundHandler);

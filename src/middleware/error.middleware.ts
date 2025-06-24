@@ -2,7 +2,7 @@ import { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
 import { RequestError } from '../utils/error.ts';
 import { errorResponse } from '../utils/response.ts';
 
-export const errorHandler: ErrorRequestHandler = (
+export const errorHandler = (
     error: Error | RequestError,
     req: Request,
     res: Response,

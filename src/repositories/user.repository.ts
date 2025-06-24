@@ -112,6 +112,71 @@ export class UserRepository {
 
     return users.length ? users[0] : null;
   }
+
+  /**
+   * Get all users (for admin/master use)
+   */
+  async getAllUsers(): Promise<User[]> {
+    const [users] = await db.execute(
+      'SELECT id, name, email, username, role, created_at FROM Users'
+    ) as [User[], any];
+
+    return users;
+  }
+
+  /**
+   * Delete a user by ID
+   */
+  async deleteUser(id: number): Promise<boolean> {
+    const [result] = await db.execute(
+      'DELETE FROM Users WHERE id = ?',
+      [id]
+    ) as [any, any];
+
+    return result.affectedRows > 0;
+  }
+
+  /**
+   * Update user role or information
+   */
+  async updateUserInfo(
+    id: number,
+    userData: {
+      name?: string;
+      email?: string;
+      role?: string;
+    }
+  ): Promise<User | null> {
+    const { name, email, role } = userData;
+    
+    // Build dynamic update query
+    let query = 'UPDATE Users SET ';
+    const params: any[] = [];
+    
+    if (name !== undefined) {
+      query += 'name = ?, ';
+      params.push(name);
+    }
+    
+    if (email !== undefined) {
+      query += 'email = ?, ';
+      params.push(email);
+    }
+    
+    if (role !== undefined) {
+      query += 'role = ?, ';
+      params.push(role);
+    }
+    
+    // Remove trailing comma and space
+    query = query.slice(0, -2);
+    query += ' WHERE id = ?';
+    params.push(id);
+    
+    await db.execute(query, params);
+    
+    return this.findById(id);
+  }
 }
 
 export const userRepository = new UserRepository();

@@ -35,6 +35,8 @@ CREATE TABLE Products (
     category ENUM('raw', 'semi', 'finished') NOT NULL,
     min_stock_threshold FLOAT DEFAULT NULL,
     location_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (subcategory_id) REFERENCES Subcategories(id) ON DELETE CASCADE,
     FOREIGN KEY (location_id) REFERENCES Locations(id) ON DELETE CASCADE
 );
@@ -45,6 +47,8 @@ CREATE TABLE ProductFormula (
     product_id INT NOT NULL,
     component_id INT NOT NULL,
     quantity FLOAT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES Products(id) ON DELETE CASCADE,
     FOREIGN KEY (component_id) REFERENCES Products(id) ON DELETE CASCADE,
     CHECK (product_id <> component_id)
