@@ -38,11 +38,10 @@ HTTP Status Codes Reference:
 Error Code Convention:
 - 1xxxx: Common/General errors
 - 2xxxx: Authentication & Authorization errors  
-- 3xxxx: Author service errors
-- 4xxxx: Admin service errors
-- 5xxxx: Content/Article service errors
-- 6xxxx: Web Story service errors
-- 7xxxx: File/Media service errors
+- 3xxxx: product management errors
+- 4xxxx: location management errors
+- 5xxxx: subcategory management errors
+- 6xxxx: formula management errors
 */
 
 export const ERRORS = {
@@ -58,6 +57,7 @@ export const ERRORS = {
     RESOURCE_NOT_FOUND: new RequestError("Resource not found", 10009, 404),
     DUPLICATE_RESOURCE: new RequestError("Resource already exists", 10010, 409),
     RESOURCE_ALREADY_EXISTS: new RequestError("Resource already exists", 10010, 409),
+    RESOURCE_IN_USE: new RequestError("Resource is in use and cannot be deleted", 10011, 400),
     
     // User Management Errors (11xxx)
     INVALID_ROLE: new RequestError("Invalid role value. Allowed values: 'master', 'employee'", 11001, 400),
@@ -82,10 +82,53 @@ export const ERRORS = {
     
     // Product Management Errors (3xxxx) 
     PRODUCT_NOT_FOUND: new RequestError("Product not found", 30001, 404),
-    INVALID_PRODUCT_DATA: new RequestError("Invalid product data", 30002, 400),
-    PRODUCT_CODE_EXISTS: new RequestError("Product code already exists", 30003, 409),
-    INVALID_FORMULA: new RequestError("Invalid product formula", 30004, 400),
-    INVENTORY_NOT_ENOUGH: new RequestError("Not enough inventory for operation", 30005, 400),
+    PRODUCT_CREATION_FAILED: new RequestError("Failed to create product", 30002, 500),
+    PRODUCT_UPDATE_FAILED: new RequestError("Failed to update product", 30003, 500),
+    PRODUCT_DELETION_FAILED: new RequestError("Failed to delete product", 30004, 500),
+    DUPLICATE_PRODUCT_NAME: new RequestError("Product with this name already exists", 30005, 409),
+    INVALID_PRODUCT_CATEGORY: new RequestError("Invalid product category. Must be 'raw', 'semi', or 'finished'", 30006, 400),
+    INVALID_PRODUCT_SOURCE_TYPE: new RequestError("Invalid product source type. Must be 'purchased', 'manufactured', or 'both'", 30007, 400),
+    PRODUCT_NAME_REQUIRED: new RequestError("Product name is required", 30008, 400),
+    PRODUCT_CATEGORY_REQUIRED: new RequestError("Product category is required", 30009, 400),
+    PRODUCT_SOURCE_TYPE_REQUIRED: new RequestError("Product source type is required", 30010, 400),
+    PRODUCT_BASE_PRICE_INVALID: new RequestError("Product base price must be a positive number", 30011, 400),
+    PRODUCT_SUBCATEGORY_REQUIRED: new RequestError("Product subcategory is required", 30012, 400),
+    PRODUCT_LOCATION_REQUIRED: new RequestError("Product location is required", 30013, 400),
+    PRODUCT_IN_USE: new RequestError("Product is used as a component in one or more formulas and cannot be deleted", 30014, 400),
+    PRODUCT_HAS_FORMULA: new RequestError("Product has a formula defined and cannot be deleted directly", 30015, 400),
+    PRODUCT_SEARCH_FAILED: new RequestError("Failed to search products", 30016, 500),
+    
+    // Location Management Errors (4xxxx)
+    LOCATION_NOT_FOUND: new RequestError("Location not found", 40001, 404), 
+    LOCATION_CREATION_FAILED: new RequestError("Failed to create location", 40002, 500),
+    LOCATION_UPDATE_FAILED: new RequestError("Failed to update location", 40003, 500),
+    LOCATION_DELETION_FAILED: new RequestError("Failed to delete location", 40004, 500),
+    DUPLICATE_LOCATION_NAME: new RequestError("Location with this name already exists", 40005, 409),
+    LOCATION_NAME_REQUIRED: new RequestError("Location name is required", 40006, 400),
+    LOCATION_IN_USE: new RequestError("Location is in use by one or more products and cannot be deleted", 40007, 400),
+    
+    // Subcategory Management Errors (5xxxx)
+    SUBCATEGORY_NOT_FOUND: new RequestError("Subcategory not found", 50001, 404),
+    SUBCATEGORY_CREATION_FAILED: new RequestError("Failed to create subcategory", 50002, 500),
+    SUBCATEGORY_UPDATE_FAILED: new RequestError("Failed to update subcategory", 50003, 500),
+    SUBCATEGORY_DELETION_FAILED: new RequestError("Failed to delete subcategory", 50004, 500),
+    DUPLICATE_SUBCATEGORY_NAME: new RequestError("Subcategory with this name already exists", 50005, 409),
+    SUBCATEGORY_NAME_REQUIRED: new RequestError("Subcategory name is required", 50006, 400),
+    SUBCATEGORY_IN_USE: new RequestError("Subcategory is in use by one or more products and cannot be deleted", 50007, 400),
+    
+    // Product Formula Errors (6xxxx)
+    PRODUCT_FORMULA_NOT_FOUND: new RequestError("Product formula not found", 60001, 404),
+    FORMULA_COMPONENT_NOT_FOUND: new RequestError("Formula component not found", 60002, 404),
+    FORMULA_CREATION_FAILED: new RequestError("Failed to create formula component", 60003, 500),
+    FORMULA_UPDATE_FAILED: new RequestError("Failed to update formula component", 60004, 500),
+    FORMULA_DELETION_FAILED: new RequestError("Failed to delete formula component", 60005, 500),
+    CIRCULAR_DEPENDENCY_ERROR: new RequestError("Adding this component would create a circular dependency in the formula", 60006, 400),
+    SELF_REFERENCE_ERROR: new RequestError("A product cannot be a component of itself", 60007, 400),
+    FORMULA_QUANTITY_INVALID: new RequestError("Formula component quantity must be a positive number", 60008, 400),
+    COMPONENT_ALREADY_EXISTS: new RequestError("This component already exists in the formula", 60009, 409),
+    COMPONENT_PRODUCT_REQUIRED: new RequestError("Component product is required", 60010, 400),
+    PARENT_PRODUCT_REQUIRED: new RequestError("Parent product is required", 60011, 400),
+    INVALID_FORMULA_FOR_RAW_MATERIAL: new RequestError("Raw materials cannot have a formula", 60012, 400),
 };
 
     // Helper function to check if error is a RequestError

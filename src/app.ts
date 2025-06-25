@@ -6,6 +6,10 @@ import { connectToDatabase } from "./database/db.ts";
 import { limiter } from "./middleware/ratelimit.middleware.ts";
 import LoginRouter from "./routes/auth.route.ts";
 import UserRouter from "./routes/user.route.ts";
+import ProductRouter from "./routes/product.route.ts";
+import LocationRouter from "./routes/location.route.ts";
+import SubcategoryRouter from "./routes/subcategory.route.ts";
+import ProductFormulaRouter from "./routes/productFormula.route.ts";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware.ts";
 
 async function start(){
@@ -40,6 +44,10 @@ app.get('/health', (req, res) => {
 //api routes
 app.use('/api/auth', LoginRouter);
 app.use('/api/users', UserRouter);
+app.use('/api/products', ProductRouter);
+app.use('/api/locations', LocationRouter);
+app.use('/api/subcategories', SubcategoryRouter);
+app.use('/api/product-formulas', ProductFormulaRouter);
 
 //erros 
 app.use(notFoundHandler);

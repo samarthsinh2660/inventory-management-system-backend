@@ -37,8 +37,8 @@ CREATE TABLE Products (
     location_id INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (subcategory_id) REFERENCES Subcategories(id) ON DELETE CASCADE,
-    FOREIGN KEY (location_id) REFERENCES Locations(id) ON DELETE CASCADE
+    FOREIGN KEY (subcategory_id) REFERENCES Subcategories(id) ON DELETE RESTRICT,
+    FOREIGN KEY (location_id) REFERENCES Locations(id) ON DELETE RESTRICT
 );
 
 -- ProductFormula Table (Bill of Materials)
@@ -49,8 +49,8 @@ CREATE TABLE ProductFormula (
     quantity FLOAT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (product_id) REFERENCES Products(id) ON DELETE CASCADE,
-    FOREIGN KEY (component_id) REFERENCES Products(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES Products(id) ON DELETE RESTRICT,
+    FOREIGN KEY (component_id) REFERENCES Products(id) ON DELETE RESTRICT,
     CHECK (product_id <> component_id)
 );
 

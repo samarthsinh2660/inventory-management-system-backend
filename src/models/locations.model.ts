@@ -13,3 +13,19 @@ export interface Location extends RowDataPacket {
   name: string;
   factory_id: number | null;
 }
+
+/**
+ * Type for location creation parameters
+ */
+export interface LocationCreateParams {
+  name: string;
+  factory_id?: number | null;
+}
+
+/**
+ * Type for location update parameters
+ */
+export interface LocationUpdateParams {
+  name?: string;
+  factory_id?: number | null;
+}
