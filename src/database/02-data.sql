@@ -42,15 +42,16 @@ VALUES
 -- Products: Steel Rod = 1, Motor Shell = 2, Fan Assembly = 3
 -- Locations: Main = 1, Assembly = 2
 
-INSERT INTO InventoryEntries (product_id, quantity, entry_type, user_id, location_id)
+INSERT INTO InventoryEntries (product_id, quantity, entry_type, user_id, location_id, notes, reference_id)
 VALUES
-  (1, 200, 'manual_in', 2, 1),         -- Bob added 200 kg of Steel Rod
-  (2, 10, 'manufacturing_in', 2, 2),   -- Bob added 10 Motor Shells
-  (3, 5, 'manufacturing_in', 2, 2);    -- Bob added 5 Fan Assemblies
+  (1, 200, 'manual_in', 2, 1, 'Initial stock', 'PO12345'),
+  (2, 10, 'manufacturing_in', 2, 2, 'Production batch A', 'MFG2023-001'),
+  (3, 5, 'manufacturing_in', 2, 2, 'Assembly complete', 'ASM2023-001');
 
 -- Audit Logs
--- Assume: Alice Master = id 1
+-- Assume: Alice Master = id 1, first inventory entry ID = 1
 
-INSERT INTO AuditLogs (action, user_id, entity_type, entity_id)
+INSERT INTO AuditLogs (entry_id, action, old_data, new_data, user_id, reason)
 VALUES
-  ('Created product Fan Assembly', 1, 'product', 3);
+  (1, 'create', NULL, JSON_OBJECT('product_id', 1, 'quantity', 200, 'entry_type', 'manual_in'), 1, 'Initial stock entry'),
+  (2, 'create', NULL, JSON_OBJECT('product_id', 2, 'quantity', 10, 'entry_type', 'manufacturing_in'), 1, 'Production record');

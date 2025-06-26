@@ -1,8 +1,8 @@
-import express from 'express';
+import { Router } from 'express';
 import {
   getAllProducts,
   getProductById,
-  createProduct, 
+  createProduct,
   updateProduct,
   deleteProduct,
   getProductsByCategory,
@@ -10,30 +10,30 @@ import {
 } from '../controllers/product.controller.ts';
 import { authenticate, requireMaster } from '../middleware/auth.middleware.ts';
 
-const router = express.Router();
+const productRouter = Router();
 
 // Apply authentication to all product routes
-router.use(authenticate);
+productRouter.use(authenticate);
 
 // Search products with filters
-router.get('/search', searchProducts);
+productRouter.get('/search', searchProducts);
 
 // Get products by category (raw, semi, finished)
-router.get('/category/:category', getProductsByCategory);
+productRouter.get('/category/:category', getProductsByCategory);
 
 // Get all products
-router.get('/', getAllProducts);
+productRouter.get('/', getAllProducts);
 
 // Get product by ID
-router.get('/:id', getProductById);
+productRouter.get('/:id', getProductById);
 
 // Create a new product (master only)
-router.post('/', requireMaster, createProduct);
+productRouter.post('/', requireMaster, createProduct);
 
 // Update product (master only)
-router.put('/:id', requireMaster, updateProduct);
+productRouter.put('/:id', requireMaster, updateProduct);
 
 // Delete product (master only)
-router.delete('/:id', requireMaster, deleteProduct);
+productRouter.delete('/:id', requireMaster, deleteProduct);
 
-export default router;
+export default productRouter;

@@ -1,2 +1,22 @@
-let use create the inventoryentries table it is ledger like a system  and every operation of the this table will be store in the auditlogs table to maintain the records of the inventoryentries table and the table is like a ledger so have to create a sql to get the total balance of the inventoryentries table and this table is handle by both master and employee 
-if employee makes a mistake that action is displayed in the auditlogs table and master can rectify the mistake by deleting that log from the auditlogs table and the inventoryentries table should get updated automaticall we can also delete the operation that employee did and the when we call the getbalance api it should get the total balance of the inventoryentries table with new update 
+Excellent question. The reference_id in your 
+InventoryEntry
+ model is a common and very useful field in inventory management systems.
+
+Its main purpose is to link an inventory movement to a source document or a related business process. This provides traceability and context for why the inventory level changed.
+
+Think of it as a way to answer the question, "This stock was moved, but why?"
+
+Here are some common examples of what you would store in the reference_id:
+
+Purchase Order (PO) Number: When you receive new stock from a supplier, you'd put the PO number here.
+Sales Order (SO) or Invoice Number: When you ship goods to a customer, you'd use the sales order or invoice number.
+Work Order Number: If you're using items for manufacturing, this would be the number of the work order that consumed the parts.
+Transfer Order Number: When moving stock between two of your own warehouses or locations.
+Return Merchandise Authorization (RMA): For items being returned by a customer.
+In your 
+test_inventory_api.sh
+ script, you are already using it correctly:
+
+For a stock-in, you use "reference_id": "PO12345".
+For a stock-out, you use "reference_id": "SO54321".
+By making it an optional VARCHAR(100), you've designed it correctly. It's flexible and only needs to be used when a corresponding document exists. This field is crucial for auditing, tracking, and financial reconciliation.

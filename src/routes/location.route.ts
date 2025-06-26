@@ -1,26 +1,31 @@
-import express from 'express';
-import {getAllLocations, getLocationById, createLocation, updateLocation, deleteLocation    } from '../controllers/location.controller.ts';
+import { Router } from 'express';
+import {
+  getAllLocations,
+  getLocationById,
+  createLocation,
+  updateLocation,
+  deleteLocation
+} from '../controllers/location.controller.ts';
 import { authenticate, requireMaster } from '../middleware/auth.middleware.ts';
 
-
-const router = express.Router();
+const locationRouter = Router();
 
 // Apply authentication to all location routes
-router.use(authenticate);
+locationRouter.use(authenticate);
 
 // Get all locations
-router.get('/', getAllLocations);
+locationRouter.get('/', getAllLocations);
 
 // Get location by ID
-router.get('/:id', getLocationById);
+locationRouter.get('/:id', getLocationById);
 
 // Create a new location (master only)
-router.post('/', requireMaster, createLocation);
+locationRouter.post('/', requireMaster, createLocation);
 
 // Update location (master only)
-router.put('/:id', requireMaster, updateLocation);
+locationRouter.put('/:id', requireMaster, updateLocation);
 
 // Delete location (master only)
-router.delete('/:id', requireMaster, deleteLocation);
+locationRouter.delete('/:id', requireMaster, deleteLocation);
 
-export default router;
+export default locationRouter;

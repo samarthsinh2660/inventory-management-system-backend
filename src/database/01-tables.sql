@@ -63,18 +63,25 @@ CREATE TABLE InventoryEntries (
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     user_id INT NOT NULL,
     location_id INT NOT NULL,
-    FOREIGN KEY (product_id) REFERENCES Products(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE,
-    FOREIGN KEY (location_id) REFERENCES Locations(id) ON DELETE CASCADE
+    notes TEXT,
+    reference_id VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES Products(id) ON DELETE RESTRICT,
+    FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE RESTRICT,
+    FOREIGN KEY (location_id) REFERENCES Locations(id) ON DELETE RESTRICT
 );
 
 -- AuditLogs Table
 CREATE TABLE AuditLogs (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    action TEXT NOT NULL,
-    user_id INT,  -- Now nullable
+    entry_id INT NOT NULL,
+    action ENUM('create', 'update', 'delete') NOT NULL,
+    old_data JSON,
+    new_data JSON,
+    user_id INT NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    entity_type VARCHAR(50) NOT NULL,
-    entity_id INT NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE SET NULL
+    reason TEXT,
+    FOREIGN KEY (entry_id) REFERENCES InventoryEntries(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE RESTRICT
 );

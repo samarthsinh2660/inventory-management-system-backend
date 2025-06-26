@@ -42,6 +42,8 @@ Error Code Convention:
 - 4xxxx: location management errors
 - 5xxxx: subcategory management errors
 - 6xxxx: formula management errors
+- 7xxxx: inventory entry management errors
+- 8xxxx: audit log management errors
 */
 
 export const ERRORS = {
@@ -129,6 +131,27 @@ export const ERRORS = {
     COMPONENT_PRODUCT_REQUIRED: new RequestError("Component product is required", 60010, 400),
     PARENT_PRODUCT_REQUIRED: new RequestError("Parent product is required", 60011, 400),
     INVALID_FORMULA_FOR_RAW_MATERIAL: new RequestError("Raw materials cannot have a formula", 60012, 400),
+    
+    // Inventory Entries Errors (7xxxx)
+    INVENTORY_ENTRY_NOT_FOUND: new RequestError("Inventory entry not found", 70001, 404),
+    INVENTORY_ENTRY_CREATION_FAILED: new RequestError("Failed to create inventory entry", 70002, 500),
+    INVENTORY_ENTRY_UPDATE_FAILED: new RequestError("Failed to update inventory entry", 70003, 500),
+    INVENTORY_ENTRY_DELETION_FAILED: new RequestError("Failed to delete inventory entry", 70004, 500),
+    INVENTORY_NEGATIVE_QUANTITY_ERROR: new RequestError("Operation would result in negative inventory", 70005, 400),
+    INVENTORY_ENTRY_INVALID_QUANTITY: new RequestError("Inventory quantity must be a non-zero number", 70006, 400),
+    INVENTORY_ENTRY_PRODUCT_REQUIRED: new RequestError("Product is required for inventory entry", 70007, 400),
+    INVENTORY_ENTRY_LOCATION_REQUIRED: new RequestError("Location is required for inventory entry", 70008, 400),
+    INVENTORY_ENTRY_TYPE_REQUIRED: new RequestError("Entry type is required", 70009, 400),
+    INVENTORY_BALANCE_RETRIEVAL_FAILED: new RequestError("Failed to retrieve inventory balance", 70010, 500),
+    
+    // Audit Log Errors (8xxxx)
+    AUDIT_LOG_NOT_FOUND: new RequestError("Audit log not found", 80001, 404), 
+    AUDIT_LOG_CREATION_FAILED: new RequestError("Failed to create audit log", 80002, 500),
+    AUDIT_LOG_DELETION_FAILED: new RequestError("Failed to delete audit log", 80003, 500),
+    AUDIT_LOG_REVERT_FAILED: new RequestError("Failed to revert changes from audit log", 80004, 500),
+    AUDIT_LOG_MASTER_ONLY: new RequestError("Only master users can modify audit logs", 80005, 403),
+    AUDIT_LOG_ENTRY_REQUIRED: new RequestError("Inventory entry ID is required", 80006, 400),
+    AUDIT_LOG_ACTION_REQUIRED: new RequestError("Action type is required", 80007, 400),
 };
 
     // Helper function to check if error is a RequestError

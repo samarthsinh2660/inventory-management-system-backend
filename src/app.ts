@@ -10,6 +10,8 @@ import ProductRouter from "./routes/product.route.ts";
 import LocationRouter from "./routes/location.route.ts";
 import SubcategoryRouter from "./routes/subcategory.route.ts";
 import ProductFormulaRouter from "./routes/productFormula.route.ts";
+import InventoryEntryRouter from "./routes/inventoryEntry.route.ts";
+import AuditLogRouter from "./routes/auditLog.route.ts";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware.ts";
 
 async function start(){
@@ -48,6 +50,8 @@ app.use('/api/products', ProductRouter);
 app.use('/api/locations', LocationRouter);
 app.use('/api/subcategories', SubcategoryRouter);
 app.use('/api/product-formulas', ProductFormulaRouter);
+app.use('/api/inventory', InventoryEntryRouter);
+app.use('/api/audit-logs', AuditLogRouter);
 
 //erros 
 app.use(notFoundHandler);

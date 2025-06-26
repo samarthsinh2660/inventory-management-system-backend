@@ -14,8 +14,12 @@ PRODUCT_ID=""
 SUBCATEGORY_ID=""
 LOCATION_ID=""
 FORMULA_ID=""
+INVENTORY_ENTRY_ID=""
+INVENTORY_ENTRY_ID_OUT=""
+AUDIT_LOG_ID=""
+AUDIT_LOG_ID_REVERT=""
 
-echo -e "${YELLOW}=== Testing Inventory Management API ===${NC}"
+echo -e "\n${YELLOW}=== Testing Inventory Management API ===${NC}"
 
 # Function to extract ID from response
 extract_id() {
@@ -279,6 +283,393 @@ if check_response_status "$PARENT_SEARCH_RESPONSE"; then
   echo -e "${GREEN}Parent Product Search test passed${NC}"
 else
   echo -e "${RED}Parent Product Search test failed${NC}"
+fi
+
+# === EMPLOYEE SIGNUP AND LOGIN TESTS ===
+echo -e "\n${YELLOW}=== Testing Employee Signup and Login ===${NC}"
+
+# Generate unique employee details using timestamp
+TIMESTAMP=$(date +%s)
+EMPLOYEE_USERNAME="employee_${TIMESTAMP}"
+EMPLOYEE_PASSWORD="password_${TIMESTAMP}"
+EMPLOYEE_EMAIL="employee_${TIMESTAMP}@example.com"
+EMPLOYEE_NAME="Test Employee ${TIMESTAMP}"
+
+echo -e "\n${YELLOW}Signing up as a new employee...${NC}"
+# Sign up as a new employee user
+EMPLOYEE_SIGNUP_RESPONSE=$(curl -s -X POST "$BASE_URL/auth/signup" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d "{
+    \"username\": \"$EMPLOYEE_USERNAME\",
+    \"password\": \"$EMPLOYEE_PASSWORD\",
+    \"email\": \"$EMPLOYEE_EMAIL\",
+    \"name\": \"$EMPLOYEE_NAME\",
+    \"role\": \"employee\"
+  }")
+
+echo "Employee Signup Response: $EMPLOYEE_SIGNUP_RESPONSE"
+
+if [[ $EMPLOYEE_SIGNUP_RESPONSE == *"success"* ]]; then
+  echo -e "${GREEN}Employee Signup test passed${NC}"
+  # Extract employee ID if needed
+  EMPLOYEE_ID=$(extract_id "$EMPLOYEE_SIGNUP_RESPONSE")
+  echo "New Employee ID: $EMPLOYEE_ID"
+else
+  echo -e "${RED}Employee Signup test failed${NC}"
+  # Optional fallback if signup fails - use a predefined employee account
+  EMPLOYEE_USERNAME="employee"
+  EMPLOYEE_PASSWORD="password123"
+  echo "Using fallback employee credentials: $EMPLOYEE_USERNAME"
+fi
+
+# Login with the newly created employee credentials
+echo -e "\n${YELLOW}Logging in as the newly created employee...${NC}"
+EMPLOYEE_LOGIN_RESPONSE=$(curl -s -X POST "$BASE_URL/auth/signin" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"username\": \"$EMPLOYEE_USERNAME\",
+    \"password\": \"$EMPLOYEE_PASSWORD\"
+  }")
+
+echo "Employee Login Response: $EMPLOYEE_LOGIN_RESPONSE"
+
+if [[ $EMPLOYEE_LOGIN_RESPONSE == *"success"* ]]; then
+  echo -e "${GREEN}Employee Login test passed${NC}"
+  EMPLOYEE_TOKEN=$(echo $EMPLOYEE_LOGIN_RESPONSE | grep -o '"token":"[^"]*' | grep -o '[^"]*$')
+  echo "Employee Token: $EMPLOYEE_TOKEN"
+  echo "Successfully logged in as employee: $EMPLOYEE_USERNAME"
+else
+  echo -e "${RED}Employee Login test failed${NC}"
+  # Continue with master token if employee login fails
+  EMPLOYEE_TOKEN=$TOKEN
+  echo "Using master token as fallback for employee operations"
+fi
+
+# === INVENTORY ENTRY TESTS ===
+echo -e "\n${YELLOW}=== Testing Inventory Entry API ===${NC}"
+
+# Store inventory entry IDs for reference and deletion
+INVENTORY_ENTRY_ID=""
+INVENTORY_ENTRY_ID_EMPLOYEE=""
+
+# Create an inventory entry (stock in)
+echo -e "\n${YELLOW}Creating a stock IN inventory entry...${NC}"
+CREATE_ENTRY_RESPONSE=$(curl -s -X POST "$BASE_URL/inventory" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d "{
+    \"product_id\": $RAW_PRODUCT_ID,
+    \"quantity\": 50,
+    \"entry_type\": \"manual_in\",
+    \"location_id\": $LOCATION_ID,
+    \"notes\": \"Initial stock for testing\",
+    \"reference_id\": \"PO12345\"
+  }")
+
+echo "Create Inventory Entry Response: $CREATE_ENTRY_RESPONSE"
+
+if [[ $CREATE_ENTRY_RESPONSE == *"success"* ]]; then
+  echo -e "${GREEN}Create Inventory Entry test passed${NC}"
+  INVENTORY_ENTRY_ID=$(extract_id "$CREATE_ENTRY_RESPONSE")
+  echo "Inventory Entry ID: $INVENTORY_ENTRY_ID"
+else
+  echo -e "${RED}Create Inventory Entry test failed${NC}"
+fi
+
+# Login as an employee to create entries that will be audited and potentially reverted
+echo -e "\n${YELLOW}Logging in as an employee user...${NC}"
+EMPLOYEE_LOGIN_RESPONSE=$(curl -s -X POST "$BASE_URL/auth/signin" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"username\": \"employee\",
+    \"password\": \"password123\"
+  }")
+
+echo "Employee Login Response: $EMPLOYEE_LOGIN_RESPONSE"
+
+if [[ $EMPLOYEE_LOGIN_RESPONSE == *"success"* ]]; then
+  echo -e "${GREEN}Employee Login test passed${NC}"
+  EMPLOYEE_TOKEN=$(echo $EMPLOYEE_LOGIN_RESPONSE | grep -o '"token":"[^"]*' | grep -o '[^"]*$')
+  echo "Employee Token: $EMPLOYEE_TOKEN"
+else
+  echo -e "${RED}Employee Login test failed${NC}"
+  # Continue with master token if employee login fails
+  EMPLOYEE_TOKEN=$TOKEN
+fi
+
+# Create an inventory entry as employee (stock out) - this will be audited and potentially reverted
+echo -e "\n${YELLOW}Creating a stock OUT inventory entry as employee...${NC}"
+CREATE_EMPLOYEE_ENTRY_RESPONSE=$(curl -s -X POST "$BASE_URL/inventory" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $EMPLOYEE_TOKEN" \
+  -d "{
+    \"product_id\": $RAW_PRODUCT_ID,
+    \"quantity\": 10,
+    \"entry_type\": \"manual_out\",
+    \"location_id\": $LOCATION_ID,
+    \"notes\": \"Employee testing stock out\",
+    \"reference_id\": \"EMP54321\"
+  }")
+
+echo "Create Employee Inventory Entry Response: $CREATE_EMPLOYEE_ENTRY_RESPONSE"
+
+if [[ $CREATE_EMPLOYEE_ENTRY_RESPONSE == *"success"* ]]; then
+  echo -e "${GREEN}Create Employee Inventory Entry test passed${NC}"
+  INVENTORY_ENTRY_ID_EMPLOYEE=$(extract_id "$CREATE_EMPLOYEE_ENTRY_RESPONSE")
+  echo "Employee Inventory Entry ID: $INVENTORY_ENTRY_ID_EMPLOYEE"
+else
+  echo -e "${RED}Create Employee Inventory Entry test failed${NC}"
+fi
+
+# Get inventory balance after employee operation
+echo -e "\n${YELLOW}Getting inventory balance after employee operation...${NC}"
+GET_BALANCE_AFTER_EMPLOYEE=$(curl -s -X GET "$BASE_URL/inventory/balance" \
+  -H "Authorization: Bearer $TOKEN")
+
+echo "Balance After Employee Operation: $GET_BALANCE_AFTER_EMPLOYEE"
+
+# Create a second inventory entry (stock out) as master
+echo -e "\n${YELLOW}Creating a stock OUT inventory entry...${NC}"
+CREATE_OUT_ENTRY_RESPONSE=$(curl -s -X POST "$BASE_URL/inventory" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d "{
+    \"product_id\": $RAW_PRODUCT_ID,
+    \"quantity\": 5,
+    \"entry_type\": \"manual_out\",
+    \"location_id\": $LOCATION_ID,
+    \"notes\": \"Testing stock out\",
+    \"reference_id\": \"SO54321\"
+  }")
+
+echo "Create Out Inventory Entry Response: $CREATE_OUT_ENTRY_RESPONSE"
+
+if [[ $CREATE_OUT_ENTRY_RESPONSE == *"success"* ]]; then
+  echo -e "${GREEN}Create Out Inventory Entry test passed${NC}"
+  INVENTORY_ENTRY_ID_OUT=$(extract_id "$CREATE_OUT_ENTRY_RESPONSE")
+  echo "Out Inventory Entry ID: $INVENTORY_ENTRY_ID_OUT"
+else
+  echo -e "${RED}Create Out Inventory Entry test failed${NC}"
+fi
+
+# Get all inventory entries
+echo -e "\n${YELLOW}Getting all inventory entries...${NC}"
+GET_ENTRIES_RESPONSE=$(curl -s -X GET "$BASE_URL/inventory" \
+  -H "Authorization: Bearer $TOKEN")
+
+echo "Get Inventory Entries Response: $GET_ENTRIES_RESPONSE"
+
+if [[ $GET_ENTRIES_RESPONSE == *"success"* ]]; then
+  echo -e "${GREEN}Get All Inventory Entries test passed${NC}"
+else
+  echo -e "${RED}Get All Inventory Entries test failed${NC}"
+fi
+
+# Get inventory entry by ID
+echo -e "\n${YELLOW}Getting inventory entry by ID...${NC}"
+GET_ENTRY_RESPONSE=$(curl -s -X GET "$BASE_URL/inventory/$INVENTORY_ENTRY_ID" \
+  -H "Authorization: Bearer $TOKEN")
+
+echo "Get Inventory Entry Response: $GET_ENTRY_RESPONSE"
+
+if [[ $GET_ENTRY_RESPONSE == *"success"* ]]; then
+  echo -e "${GREEN}Get Inventory Entry By ID test passed${NC}"
+else
+  echo -e "${RED}Get Inventory Entry By ID test failed${NC}"
+fi
+
+# Get product-specific inventory entries
+echo -e "\n${YELLOW}Getting product-specific inventory entries...${NC}"
+GET_PRODUCT_ENTRIES_RESPONSE=$(curl -s -X GET "$BASE_URL/inventory/product/$RAW_PRODUCT_ID" \
+  -H "Authorization: Bearer $TOKEN")
+
+echo "Get Product Inventory Entries Response: $GET_PRODUCT_ENTRIES_RESPONSE"
+
+if [[ $GET_PRODUCT_ENTRIES_RESPONSE == *"success"* ]]; then
+  echo -e "${GREEN}Get Product Inventory Entries test passed${NC}"
+else
+  echo -e "${RED}Get Product Inventory Entries test failed${NC}"
+fi
+
+# Get inventory balance
+echo -e "\n${YELLOW}Getting inventory balance...${NC}"
+GET_BALANCE_RESPONSE=$(curl -s -X GET "$BASE_URL/inventory/balance" \
+  -H "Authorization: Bearer $TOKEN")
+
+echo "Get Inventory Balance Response: $GET_BALANCE_RESPONSE"
+
+if [[ $GET_BALANCE_RESPONSE == *"success"* ]]; then
+  echo -e "${GREEN}Get Inventory Balance test passed${NC}"
+else
+  echo -e "${RED}Get Inventory Balance test failed${NC}"
+fi
+
+# Update inventory entry (master only)
+echo -e "\n${YELLOW}Updating an inventory entry...${NC}"
+UPDATE_ENTRY_RESPONSE=$(curl -s -X PUT "$BASE_URL/inventory/$INVENTORY_ENTRY_ID" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d "{
+    \"notes\": \"Updated notes for testing\",
+    \"reference_id\": \"PO12345-Updated\",
+    \"reason\": \"Testing update functionality\"
+  }")
+
+echo "Update Inventory Entry Response: $UPDATE_ENTRY_RESPONSE"
+
+if [[ $UPDATE_ENTRY_RESPONSE == *"success"* ]]; then
+  echo -e "${GREEN}Update Inventory Entry test passed${NC}"
+else
+  echo -e "${RED}Update Inventory Entry test failed${NC}"
+fi
+
+# === AUDIT LOG TESTS ===
+echo -e "\n${YELLOW}=== Testing Audit Log API ===${NC}"
+
+# Get all audit logs
+echo -e "\n${YELLOW}Getting all audit logs...${NC}"
+GET_LOGS_RESPONSE=$(curl -s -X GET "$BASE_URL/audit-logs" \
+  -H "Authorization: Bearer $TOKEN")
+
+echo "Get Audit Logs Response: $GET_LOGS_RESPONSE"
+
+if [[ $GET_LOGS_RESPONSE == *"success"* ]]; then
+  echo -e "${GREEN}Get All Audit Logs test passed${NC}"
+else
+  echo -e "${RED}Get All Audit Logs test failed${NC}"
+fi
+
+# Find audit log ID for employee operation (used for reversion test)
+# This is important for testing the reversion of employee operations
+echo -e "\n${YELLOW}Finding audit log for employee operation to test reversion...${NC}"
+EMPLOYEE_AUDIT_RESPONSE=$(curl -s -X GET "$BASE_URL/audit-logs?entry_id=$INVENTORY_ENTRY_ID_EMPLOYEE" \
+  -H "Authorization: Bearer $TOKEN")
+
+echo "Employee Audit Log Search Response: $EMPLOYEE_AUDIT_RESPONSE"
+
+# Extract the audit log ID that we can use to revert the employee's operation
+EMPLOYEE_AUDIT_LOG_ID=$(echo $EMPLOYEE_AUDIT_RESPONSE | grep -o '"id":[0-9]*' | grep -o '[0-9]*' | head -1)
+echo "Employee Audit Log ID (for reversion test): $EMPLOYEE_AUDIT_LOG_ID"
+
+# Get another audit log for standard tests
+echo -e "\n${YELLOW}Getting another audit log for standard tests...${NC}"
+STANDARD_AUDIT_RESPONSE=$(curl -s -X GET "$BASE_URL/audit-logs" \
+  -H "Authorization: Bearer $TOKEN")
+AUDIT_LOG_ID=$(echo $STANDARD_AUDIT_RESPONSE | grep -o '"id":[0-9]*' | grep -o '[0-9]*' | head -1)
+echo "Standard Audit Log ID: $AUDIT_LOG_ID"
+
+# Get audit log by ID
+echo -e "\n${YELLOW}Getting audit log by ID...${NC}"
+GET_LOG_RESPONSE=$(curl -s -X GET "$BASE_URL/audit-logs/$AUDIT_LOG_ID" \
+  -H "Authorization: Bearer $TOKEN")
+
+echo "Get Audit Log Response: $GET_LOG_RESPONSE"
+
+if [[ $GET_LOG_RESPONSE == *"success"* ]]; then
+  echo -e "${GREEN}Get Audit Log By ID test passed${NC}"
+else
+  echo -e "${RED}Get Audit Log By ID test failed${NC}"
+fi
+
+# Get audit logs by record type (inventory entries)
+echo -e "\n${YELLOW}Getting audit logs by record type...${NC}"
+GET_LOGS_BY_TYPE_RESPONSE=$(curl -s -X GET "$BASE_URL/audit-logs/record-type/inventory_entries" \
+  -H "Authorization: Bearer $TOKEN")
+
+echo "Get Audit Logs By Type Response: $GET_LOGS_BY_TYPE_RESPONSE"
+
+if [[ $GET_LOGS_BY_TYPE_RESPONSE == *"success"* ]]; then
+  echo -e "${GREEN}Get Audit Logs By Record Type test passed${NC}"
+else
+  echo -e "${RED}Get Audit Logs By Record Type test failed${NC}"
+fi
+
+# Delete an audit log without reversion (master only)
+echo -e "\n${YELLOW}Deleting audit log without reversion...${NC}"
+DELETE_LOG_RESPONSE=$(curl -s -X DELETE "$BASE_URL/audit-logs/$AUDIT_LOG_ID" \
+  -H "Authorization: Bearer $TOKEN")
+
+echo "Delete Audit Log Response: $DELETE_LOG_RESPONSE"
+
+if [[ $DELETE_LOG_RESPONSE == *"success"* ]]; then
+  echo -e "${GREEN}Delete Audit Log test passed${NC}"
+else
+  echo -e "${RED}Delete Audit Log test failed${NC}"
+fi
+
+# Check inventory balance before reverting employee operation
+echo -e "\n${YELLOW}Getting inventory balance before reversion...${NC}"
+BALANCE_BEFORE_REVERT=$(curl -s -X GET "$BASE_URL/inventory/balance" \
+  -H "Authorization: Bearer $TOKEN")
+echo "Balance Before Reverting Employee Operation: $BALANCE_BEFORE_REVERT"
+
+# Delete employee audit log with reversion (master only)
+# This is the key test for reverting an employee operation
+if [[ ! -z "$EMPLOYEE_AUDIT_LOG_ID" ]]; then
+  echo -e "\n${YELLOW}Deleting employee audit log WITH reversion (reverting employee's operation)...${NC}"
+  DELETE_EMPLOYEE_LOG_RESPONSE=$(curl -s -X DELETE "$BASE_URL/audit-logs/$EMPLOYEE_AUDIT_LOG_ID?revert=true" \
+    -H "Authorization: Bearer $TOKEN")
+
+  echo "Delete Employee Audit Log with Reversion Response: $DELETE_EMPLOYEE_LOG_RESPONSE"
+
+  if [[ $DELETE_EMPLOYEE_LOG_RESPONSE == *"success"* ]]; then
+    echo -e "${GREEN}Delete Employee Audit Log with Reversion test passed${NC}"
+    
+    # Check inventory balance after reverting employee operation
+    echo -e "\n${YELLOW}Getting inventory balance after reversion...${NC}"
+    BALANCE_AFTER_REVERT=$(curl -s -X GET "$BASE_URL/inventory/balance" \
+      -H "Authorization: Bearer $TOKEN")
+    echo "Balance After Reverting Employee Operation: $BALANCE_AFTER_REVERT"
+    
+    # Compare balances to verify reversion worked
+    echo -e "\n${YELLOW}Verifying reversion of employee operation...${NC}"
+    echo "If reversion worked correctly, the inventory balance should have changed"
+  else
+    echo -e "${RED}Delete Employee Audit Log with Reversion test failed${NC}"
+  fi
+fi
+
+# Delete inventory entries
+echo -e "\n${YELLOW}Deleting remaining inventory entries...${NC}"
+
+# Delete out entry
+if [[ ! -z "$INVENTORY_ENTRY_ID_OUT" ]]; then
+  DELETE_OUT_ENTRY_RESPONSE=$(curl -s -X DELETE "$BASE_URL/inventory/$INVENTORY_ENTRY_ID_OUT" \
+    -H "Authorization: Bearer $TOKEN")
+
+  echo "Delete Out Inventory Entry Response: $DELETE_OUT_ENTRY_RESPONSE"
+  if [[ $DELETE_OUT_ENTRY_RESPONSE == *"success"* ]]; then
+    echo -e "${GREEN}Delete Out Inventory Entry test passed${NC}"
+  else
+    echo -e "${RED}Delete Out Inventory Entry test failed${NC}"
+  fi
+fi
+
+# Delete in entry
+if [[ ! -z "$INVENTORY_ENTRY_ID" ]]; then
+  DELETE_ENTRY_RESPONSE=$(curl -s -X DELETE "$BASE_URL/inventory/$INVENTORY_ENTRY_ID" \
+    -H "Authorization: Bearer $TOKEN")
+
+  echo "Delete Inventory Entry Response: $DELETE_ENTRY_RESPONSE"
+  if [[ $DELETE_ENTRY_RESPONSE == *"success"* ]]; then
+    echo -e "${GREEN}Delete Inventory Entry test passed${NC}"
+  else
+    echo -e "${RED}Delete Inventory Entry test failed${NC}"
+  fi
+fi
+
+# Delete employee entry if it wasn't already reverted
+if [[ ! -z "$INVENTORY_ENTRY_ID_EMPLOYEE" ]]; then
+  DELETE_EMPLOYEE_ENTRY_RESPONSE=$(curl -s -X DELETE "$BASE_URL/inventory/$INVENTORY_ENTRY_ID_EMPLOYEE" \
+    -H "Authorization: Bearer $TOKEN")
+
+  echo "Delete Employee Entry Response: $DELETE_EMPLOYEE_ENTRY_RESPONSE"
+  if [[ $DELETE_EMPLOYEE_ENTRY_RESPONSE == *"success"* ]]; then
+    echo -e "${GREEN}Delete Employee Entry test passed${NC}"
+  else
+    echo -e "${RED}Delete Employee Entry test failed${NC} (This might be expected if the entry was already reverted)"
+  fi
 fi
 
 # === DELETION TESTS (Clean up) ===
