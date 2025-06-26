@@ -19,6 +19,7 @@ This API provides a comprehensive inventory management system with audit logging
 - [Customization Options](#customization-options)
 - [Error Handling](#error-handling)
 - [Database Schema](#database-schema)
+- [Stock Alert System](#stock-alert-system)
 
 ## Setup and Installation
 
@@ -943,6 +944,130 @@ Response:
   "message": "Product formula deleted successfully"
 }
 ```
+
+## Stock Alert System
+
+The Inventory Management System includes a comprehensive stock threshold alert mechanism that automatically monitors inventory levels and notifies master users when products fall below their defined minimum thresholds.
+
+#### Key Features
+
+- **Automatic Monitoring**: The system continuously monitors stock levels after every inventory operation
+- **Threshold Configuration**: Each product can have its own minimum stock threshold (`min_stock_threshold`) 
+- **In-App Notifications**: Alerts are immediately available in the admin dashboard
+- **Alert Management**: Master users can mark alerts as resolved after taking action
+- **Manual Checking**: Admins can manually trigger threshold checks at any time
+
+#### How It Works
+
+1. When inventory operations occur (adding or removing stock), the system automatically:
+   - Calculates current stock levels for affected products
+   - Compares them against their configured minimum thresholds
+   - Generates alerts for products that fall below threshold
+   - Creates in-app notifications for master users
+
+2. Alerts are stored in two database tables:
+   - `StockAlerts`: Tracks all threshold violations with product details and resolution status
+   - `Notifications`: Stores user-specific notifications for the admin dashboard
+
+3. Master users can:
+   - View all products currently below threshold 
+   - See detailed alert information with product and location data
+   - Mark alerts as resolved after addressing the issue
+   - Manually trigger checks for new alerts
+
+#### Stock Alert APIs
+
+| Method | Endpoint | Description | Authorization |
+|--------|----------|-------------|--------------|
+| GET | `/api/alerts` | Get all stock alerts with pagination | Any |
+| GET | `/api/alerts/stock/threshold` | Get products below minimum threshold | Any |
+| PATCH | `/api/alerts/:id/resolve` | Mark an alert as resolved | Master |
+| POST | `/api/alerts/check` | Manually trigger check for new alerts | Master |
+
+#### Sample API Responses
+
+**Get all alerts:**
+```json
+{
+  "success": true,
+  "count": 2,
+  "total": 5,
+  "page": 1,
+  "limit": 10,
+  "data": [
+    {
+      "id": 1,
+      "product_id": 5,
+      "product_name": "Steel Sheet 5mm",
+      "current_stock": 45.5,
+      "min_threshold": 50,
+      "location_name": "Main Warehouse",
+      "created_at": "2025-06-26T10:30:15.000Z",
+      "is_resolved": false,
+      "resolved_at": null
+    },
+    {
+      "id": 2,
+      "product_id": 8,
+      "product_name": "Blue Paint",
+      "current_stock": 3,
+      "min_threshold": 5,
+      "location_name": "Paint Shop",
+      "created_at": "2025-06-26T11:15:22.000Z",
+      "is_resolved": false,
+      "resolved_at": null
+    }
+  ]
+}
+```
+
+**Products below threshold:**
+```json
+{
+  "success": true,
+  "count": 3,
+  "data": [
+    {
+      "id": 5,
+      "name": "Steel Sheet 5mm",
+      "min_stock_threshold": 50,
+      "current_stock": 45.5,
+      "location_id": 1,
+      "location_name": "Main Warehouse"
+    },
+    // ...more products
+  ]
+}
+```
+
+#### Implementing in the Admin Dashboard
+
+To implement the alert system in your frontend admin dashboard:
+
+1. **Setup:**
+   - Set appropriate `min_stock_threshold` values for each product when creating/updating them
+
+2. **Dashboard Display:**
+   - Poll the `/api/alerts?resolved=false` endpoint periodically to fetch active alerts
+   - Display a notification count or badge showing the number of unresolved alerts
+   - Create a dedicated alerts section on the dashboard
+
+3. **Alert Handling:**
+   - Show alert details including product name, current stock, threshold, and location
+   - Provide action buttons for restocking or viewing product details
+   - Allow admins to mark alerts as resolved using the `PATCH /api/alerts/:id/resolve` endpoint
+   
+4. **Manual Checking:**
+   - Provide a "Check Alerts" button that calls `POST /api/alerts/check` to manually trigger a threshold check
+
+#### Integration with Inventory Operations
+
+The alert system is automatically triggered after these operations:
+- Adding inventory (manual_in)
+- Removing inventory (manual_out)
+- Manufacturing processes (manufacturing_in/out)
+
+This ensures real-time monitoring without requiring manual checks.
 
 ## Customization Options
 

@@ -104,7 +104,21 @@ export class InventoryEntryRepository {
       await connection.commit();
       
       // Return the created entry
-      return await this.findById(entryId) as InventoryEntry;
+      const entry = await this.findById(entryId) as InventoryEntry;
+      
+      // After successfully creating the entry, check if there are any threshold alerts
+      // Do this outside the transaction to avoid slowing down the main operation
+      setImmediate(() => {
+        import('../services/alert.service.ts')
+          .then(module => {
+            const alertService = module.default;
+            alertService.checkAndSendAlerts()
+              .catch(err => console.error("Error checking alerts after inventory change:", err));
+          })
+          .catch(err => console.error("Error importing alert service:", err));
+      });
+      
+      return entry;
     } catch (error) {
       await connection.rollback();
       console.error("Error creating inventory entry:", error);
@@ -270,7 +284,12 @@ export class InventoryEntryRepository {
         SELECT 
           p.id as product_id, 
           p.name as product_name, 
-          COALESCE(SUM(ie.quantity), 0) as total_quantity,
+          COALESCE(SUM(
+            CASE 
+              WHEN ie.entry_type IN ('manual_in', 'manufacturing_in') THEN ie.quantity
+              ELSE -ie.quantity
+            END
+          ), 0) as total_quantity,
           ie.location_id,
           l.name as location_name
         FROM 

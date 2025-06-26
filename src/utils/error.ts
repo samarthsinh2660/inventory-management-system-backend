@@ -44,6 +44,7 @@ Error Code Convention:
 - 6xxxx: formula management errors
 - 7xxxx: inventory entry management errors
 - 8xxxx: audit log management errors
+- 9xxxx: alert and notification management errors
 */
 
 export const ERRORS = {
@@ -152,6 +153,20 @@ export const ERRORS = {
     AUDIT_LOG_MASTER_ONLY: new RequestError("Only master users can modify audit logs", 80005, 403),
     AUDIT_LOG_ENTRY_REQUIRED: new RequestError("Inventory entry ID is required", 80006, 400),
     AUDIT_LOG_ACTION_REQUIRED: new RequestError("Action type is required", 80007, 400),
+    
+    // Alert and Notification Management Errors (9xxxx)
+    ALERT_NOT_FOUND: new RequestError("Alert not found", 90001, 404),
+    INVALID_ALERT_ID: new RequestError("Invalid alert ID", 90002, 400),
+    ALERT_MASTER_ONLY: new RequestError("Only master users can manage alerts", 90003, 403),
+    NOTIFICATION_NOT_FOUND: new RequestError("Notification not found or does not belong to you", 90004, 404),
+    INVALID_NOTIFICATION_ID: new RequestError("Invalid notification ID", 90005, 400),
+    NOTIFICATION_AUTH_REQUIRED: new RequestError("Authentication required to manage notifications", 90006, 401),
+    ALERT_CHECK_FAILED: new RequestError("Failed to check for alerts", 90007, 500),
+    ALERT_RESOLUTION_FAILED: new RequestError("Failed to resolve alert", 90008, 500),
+    GET_ALERTS_FAILED: new RequestError("Failed to get stock alerts", 90009, 500),
+    GET_NOTIFICATIONS_FAILED: new RequestError("Failed to get notifications", 90010, 500),
+    UPDATE_NOTIFICATION_FAILED: new RequestError("Failed to update notification", 90011, 500),
+    GET_LOW_STOCK_PRODUCTS_FAILED: new RequestError("Failed to get low stock products", 90012, 500),
 };
 
     // Helper function to check if error is a RequestError
