@@ -1139,4 +1139,6 @@ The system uses a relational database with the following tables:
 - `AuditLogs`: Audit trail of changes to inventory entries
 - `ProductFormulas`: Bill of materials for products
 
-See the SQL schema in the `src/database/01-tables.sql` file for complete details.
+See the SQL schema in the 
+![uml](https://github.com/user-attachments/assets/635b4b6a-967d-48b7-b908-19cc58c9a52e)
+.
