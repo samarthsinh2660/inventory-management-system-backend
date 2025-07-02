@@ -17,25 +17,28 @@ VALUES
   ('Casing'),
   ('Electronics');
 
+-- Product Formulas with JSON components
+INSERT INTO ProductFormula (name, description, components)
+VALUES
+  ('Fan Assembly Formula', 'Components required for standard fan assembly', 
+   JSON_ARRAY(
+     JSON_OBJECT('id', UUID(), 'component_id', 1, 'component_name', 'Steel Rod', 'quantity', 3),
+     JSON_OBJECT('id', UUID(), 'component_id', 2, 'component_name', 'Motor Shell', 'quantity', 1)
+   )
+  );
+
 -- Products
 -- Get required foreign keys first (in your code, or manually lookup)
 -- Assuming IDs:
 -- Subcategories: Metals = 1, Casing = 2, Electronics = 3
 -- Locations: Main = 1, Assembly = 2
+-- ProductFormula: Fan Assembly Formula = 1
 
-INSERT INTO Products (subcategory_id, name, unit, source_type, category, min_stock_threshold, location_id)
+INSERT INTO Products (subcategory_id, name, unit, source_type, category, min_stock_threshold, location_id, product_formula_id, price)
 VALUES
-  (1, 'Steel Rod', 'kg', 'trading', 'raw', 100, 1),     -- Raw Trading product
-  (2, 'Motor Shell', 'pcs', 'manufacturing', 'semi', 20, 2), -- Semi-finished
-  (3, 'Fan Assembly', 'pcs', 'manufacturing', 'finished', 10, 2); -- Final product
-
--- ProductFormula (Fan Assembly made from 1x Motor Shell + 3 kg Steel Rod)
--- Assume: Steel Rod = id 1, Motor Shell = id 2, Fan Assembly = id 3
-
-INSERT INTO ProductFormula (product_id, component_id, quantity)
-VALUES
-  (3, 2, 1),  -- 1x Motor Shell
-  (3, 1, 3);  -- 3 kg Steel Rod
+  (1, 'Steel Rod', 'kg', 'trading', 'raw', 100, 1, NULL, 25.50),     -- Raw Trading product
+  (2, 'Motor Shell', 'pcs', 'manufacturing', 'semi', 20, 2, NULL, 75.00), -- Semi-finished
+  (3, 'Fan Assembly', 'pcs', 'manufacturing', 'finished', 10, 2, 1, 150.00); -- Final product with formula
 
 -- Inventory Entries (Ledger)
 -- Assume: Bob Employee = id 2

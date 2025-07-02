@@ -1,5 +1,14 @@
 import { Router } from 'express';
-import {getAllFormulas, getFormulaByProductId, addFormulaComponent, updateFormulaComponent, deleteFormulaComponent, clearProductFormula    } from '../controllers/productFormula.controller.ts';
+import {
+  getAllFormulas,
+  getFormulaById,
+  getProductsByFormulaId,
+  createFormula,
+  updateFormula,
+  deleteFormula,
+  updateFormulaComponent,
+  removeFormulaComponent
+} from '../controllers/productFormula.controller.ts';
 import { authenticate, requireMaster } from '../middleware/auth.middleware.ts';
 
 const productFormulaRouter = Router();
@@ -10,19 +19,25 @@ productFormulaRouter.use(authenticate);
 // Get all formulas
 productFormulaRouter.get('/', getAllFormulas);
 
-// Get formula components for a specific product
-productFormulaRouter.get('/product/:productId', getFormulaByProductId);
+// Get a specific formula by ID
+productFormulaRouter.get('/:id', getFormulaById);
 
-// Add component to product formula (master only)
-productFormulaRouter.post('/', requireMaster, addFormulaComponent);
+// Get products using a specific formula
+productFormulaRouter.get('/:id/products', getProductsByFormulaId);
 
-// Update formula component quantity (master only)
-productFormulaRouter.put('/:id', requireMaster, updateFormulaComponent);
+// Create a new formula (master only)
+productFormulaRouter.post('/', requireMaster, createFormula);
 
-// Delete formula component (master only)
-productFormulaRouter.delete('/:id', requireMaster, deleteFormulaComponent);
+// Update a formula (master only)
+productFormulaRouter.put('/:id', requireMaster, updateFormula);
 
-// Clear all components for a product (clear formula) (master only)
-productFormulaRouter.delete('/product/:productId', requireMaster, clearProductFormula);
+// Delete a formula (master only)
+productFormulaRouter.delete('/:id', requireMaster, deleteFormula);
+
+// Add or update a component in a formula (master only)
+productFormulaRouter.put('/:id/component', requireMaster, updateFormulaComponent);
+
+// Remove a component from a formula (master only)
+productFormulaRouter.delete('/:formulaId/component/:componentId', requireMaster, removeFormulaComponent);
 
 export default productFormulaRouter;

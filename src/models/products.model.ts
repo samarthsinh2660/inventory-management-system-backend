@@ -21,10 +21,13 @@ CREATE TABLE Products (
     category ENUM('raw', 'semi', 'finished') NOT NULL,
     min_stock_threshold FLOAT DEFAULT NULL,
     location_id INT NOT NULL,
+    price DECIMAL(10, 2) DEFAULT 0.00,
+    product_formula_id INT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (subcategory_id) REFERENCES Subcategories(id) ON DELETE RESTRICT,
-    FOREIGN KEY (location_id) REFERENCES Locations(id) ON DELETE RESTRICT
+    FOREIGN KEY (location_id) REFERENCES Locations(id) ON DELETE RESTRICT,
+    FOREIGN KEY (product_formula_id) REFERENCES ProductFormula(id) ON DELETE SET NULL
 )
 `;
 
@@ -37,6 +40,8 @@ export interface Product extends RowDataPacket {
   category: ProductCategory;
   min_stock_threshold: number | null;
   location_id: number;
+  price: number;
+  product_formula_id: number | null;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -69,4 +74,6 @@ export interface ProductCreateParams {
   min_stock_threshold?: number | null;
   location_id: number;
   subcategory_id: number;
+  price?: number;
+  product_formula_id?: number | null;
 }

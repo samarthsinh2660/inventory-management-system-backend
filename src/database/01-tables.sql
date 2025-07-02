@@ -25,33 +25,33 @@ CREATE TABLE Subcategories (
     name VARCHAR(100) NOT NULL
 );
 
+-- ProductFormula Table (now with JSON components)
+CREATE TABLE ProductFormula (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    components JSON NOT NULL, -- Stores array of {id, component_id, component_name, quantity}
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 -- Products Table (category ENUM included directly)
 CREATE TABLE Products (
     id INT AUTO_INCREMENT PRIMARY KEY,
     subcategory_id INT NOT NULL,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL UNIQUE,
     unit VARCHAR(20) NOT NULL,
     source_type ENUM('manufacturing', 'trading') NOT NULL,
     category ENUM('raw', 'semi', 'finished') NOT NULL,
     min_stock_threshold FLOAT DEFAULT NULL,
     location_id INT NOT NULL,
+    product_formula_id INT DEFAULT NULL,  -- New: Reference to product formula
+    price DECIMAL(10, 2) DEFAULT 0.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (subcategory_id) REFERENCES Subcategories(id) ON DELETE RESTRICT,
-    FOREIGN KEY (location_id) REFERENCES Locations(id) ON DELETE RESTRICT
-);
-
--- ProductFormula Table (Bill of Materials)
-CREATE TABLE ProductFormula (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    product_id INT NOT NULL,
-    component_id INT NOT NULL,
-    quantity FLOAT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (product_id) REFERENCES Products(id) ON DELETE RESTRICT,
-    FOREIGN KEY (component_id) REFERENCES Products(id) ON DELETE RESTRICT,
-    CHECK (product_id <> component_id)
+    FOREIGN KEY (location_id) REFERENCES Locations(id) ON DELETE RESTRICT,
+    FOREIGN KEY (product_formula_id) REFERENCES ProductFormula(id) ON DELETE RESTRICT
 );
 
 -- InventoryEntries Table (Ledger)

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { productRepository } from '../repositories/product.repository.ts';
+import { productFormulaRepository } from '../repositories/productFormula.repository.ts';
 import { ERRORS } from '../utils/error.ts';
 import { successResponse, listResponse, createdResponse, updatedResponse, deletedResponse } from '../utils/response.ts';
 import { ProductCategory, ProductSearchParams, SourceType } from '../models/products.model.ts';
@@ -65,7 +66,17 @@ export const getProductsByCategory = async (req: Request, res: Response, next: N
  */
 export const createProduct = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { name, unit, source_type, category, min_stock_threshold, location_id, subcategory_id } = req.body;
+    const { 
+      name, 
+      unit, 
+      source_type, 
+      category, 
+      min_stock_threshold, 
+      location_id, 
+      subcategory_id, 
+      price,
+      product_formula_id 
+    } = req.body;
     
     // Basic validation
     if (!name) {
@@ -107,7 +118,20 @@ export const createProduct = async (req: Request, res: Response, next: NextFunct
     // Check for duplicate name
     const existingProduct = await productRepository.findByName(name);
     if (existingProduct) {
-      throw ERRORS.DUPLICATE_PRODUCT_NAME;
+      throw ERRORS.PRODUCT_NAME_EXISTS;
+    }
+
+    // If a formula ID is provided, verify that the formula exists
+    if (product_formula_id) {
+      const formula = await productFormulaRepository.findById(Number(product_formula_id));
+      if (!formula) {
+        throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
+      }
+
+      // Raw materials cannot have formulas
+      if (category === ProductCategory.RAW) {
+        throw ERRORS.INVALID_FORMULA_FOR_RAW_MATERIAL;
+      }
     }
     
     try {
@@ -118,7 +142,9 @@ export const createProduct = async (req: Request, res: Response, next: NextFunct
         category,
         min_stock_threshold: min_stock_threshold || null,
         location_id,
-        subcategory_id
+        subcategory_id,
+        price,
+        product_formula_id: product_formula_id ? Number(product_formula_id) : null
       });
       
       res.status(201).json(createdResponse(product, 'Product created successfully'));
@@ -141,12 +167,17 @@ export const updateProduct = async (req: Request, res: Response, next: NextFunct
       throw ERRORS.INVALID_PARAMS;
     }
     
-    const { name, unit, source_type, category, min_stock_threshold, location_id, subcategory_id } = req.body;
-    
-    // At least one field should be provided for update
-    if (!name && !unit && !source_type && !category && min_stock_threshold === undefined && !location_id && !subcategory_id) {
-      throw ERRORS.VALIDATION_ERROR;
-    }
+    const { 
+      name, 
+      unit, 
+      source_type, 
+      category, 
+      min_stock_threshold, 
+      location_id, 
+      subcategory_id, 
+      price,
+      product_formula_id 
+    } = req.body;
     
     // Check if product exists
     const existingProduct = await productRepository.findById(productId);
@@ -154,40 +185,72 @@ export const updateProduct = async (req: Request, res: Response, next: NextFunct
       throw ERRORS.PRODUCT_NOT_FOUND;
     }
     
-    // Validate category if provided
-    if (category) {
+    // Prepare update data
+    const updateData: Record<string, any> = {};
+    
+    // Handle name update and check for duplicates
+    if (name !== undefined && name !== existingProduct.name) {
+      const duplicateProduct = await productRepository.findByName(name);
+      if (duplicateProduct && duplicateProduct.id !== productId) {
+        throw ERRORS.PRODUCT_NAME_EXISTS;
+      }
+      updateData.name = name;
+    }
+    
+    // Handle other basic fields
+    if (unit !== undefined) updateData.unit = unit;
+    if (price !== undefined) updateData.price = price;
+    
+    // Handle category update
+    if (category !== undefined) {
       const validCategories = Object.values(ProductCategory);
       if (!validCategories.includes(category)) {
         throw ERRORS.INVALID_PRODUCT_CATEGORY;
       }
+      updateData.category = category;
     }
     
-    // Validate source_type if provided
-    if (source_type) {
+    // Handle source_type update
+    if (source_type !== undefined) {
       const validSourceTypes = Object.values(SourceType);
       if (!validSourceTypes.includes(source_type)) {
         throw ERRORS.INVALID_PRODUCT_SOURCE_TYPE;
       }
+      updateData.source_type = source_type;
     }
     
-    // Check for duplicate name if name is being changed
-    if (name && name !== existingProduct.name) {
-      const duplicateProduct = await productRepository.findByName(name);
-      if (duplicateProduct) {
-        throw ERRORS.DUPLICATE_PRODUCT_NAME;
+    // Handle numeric fields
+    if (min_stock_threshold !== undefined) {
+      updateData.min_stock_threshold = min_stock_threshold === null ? null : Number(min_stock_threshold);
+    }
+    
+    if (location_id !== undefined) updateData.location_id = Number(location_id);
+    if (subcategory_id !== undefined) updateData.subcategory_id = Number(subcategory_id);
+
+    // Handle product_formula_id update
+    if (product_formula_id !== undefined) {
+      // If setting to null, that's allowed
+      if (product_formula_id === null) {
+        updateData.product_formula_id = null;
+      } else {
+        // Verify the formula exists
+        const formula = await productFormulaRepository.findById(Number(product_formula_id));
+        if (!formula) {
+          throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
+        }
+
+        // Raw materials cannot have formulas
+        const categoryToCheck = category !== undefined ? category : existingProduct.category;
+        if (categoryToCheck === ProductCategory.RAW) {
+          throw ERRORS.INVALID_FORMULA_FOR_RAW_MATERIAL;
+        }
+
+        updateData.product_formula_id = Number(product_formula_id);
       }
     }
     
     try {
-      const updatedProduct = await productRepository.update(productId, {
-        name,
-        unit,
-        source_type,
-        category,
-        min_stock_threshold,
-        location_id,
-        subcategory_id
-      });
+      const updatedProduct = await productRepository.update(productId, updateData);
       
       res.json(updatedResponse(updatedProduct, 'Product updated successfully'));
     } catch (error: unknown) {
@@ -216,9 +279,17 @@ export const deleteProduct = async (req: Request, res: Response, next: NextFunct
     }
     
     try {
-      await productRepository.deleteProduct(productId);
+      await productRepository.delete(productId);
       res.json(deletedResponse('Product deleted successfully'));
     } catch (error: unknown) {
+      // Pass through known errors directly
+      if (error === ERRORS.PRODUCT_NOT_FOUND || 
+          error === ERRORS.PRODUCT_IN_USE || 
+          error === ERRORS.PRODUCT_HAS_FORMULA ||
+          (error as any)?.code === ERRORS.PRODUCT_IN_USE.code ||
+          (error as any)?.code === ERRORS.PRODUCT_HAS_FORMULA.code) {
+        throw error;
+      }
       throw ERRORS.PRODUCT_DELETION_FAILED;
     }
   } catch (error: unknown) {

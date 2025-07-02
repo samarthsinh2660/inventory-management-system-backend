@@ -122,16 +122,21 @@ export const ERRORS = {
     // Product Formula Errors (6xxxx)
     PRODUCT_FORMULA_NOT_FOUND: new RequestError("Product formula not found", 60001, 404),
     FORMULA_COMPONENT_NOT_FOUND: new RequestError("Formula component not found", 60002, 404),
-    FORMULA_CREATION_FAILED: new RequestError("Failed to create formula component", 60003, 500),
-    FORMULA_UPDATE_FAILED: new RequestError("Failed to update formula component", 60004, 500),
-    FORMULA_DELETION_FAILED: new RequestError("Failed to delete formula component", 60005, 500),
-    CIRCULAR_DEPENDENCY_ERROR: new RequestError("Adding this component would create a circular dependency in the formula", 60006, 400),
     SELF_REFERENCE_ERROR: new RequestError("A product cannot be a component of itself", 60007, 400),
     FORMULA_QUANTITY_INVALID: new RequestError("Formula component quantity must be a positive number", 60008, 400),
     COMPONENT_ALREADY_EXISTS: new RequestError("This component already exists in the formula", 60009, 409),
     COMPONENT_PRODUCT_REQUIRED: new RequestError("Component product is required", 60010, 400),
     PARENT_PRODUCT_REQUIRED: new RequestError("Parent product is required", 60011, 400),
     INVALID_FORMULA_FOR_RAW_MATERIAL: new RequestError("Raw materials cannot have a formula", 60012, 400),
+    FORMULA_CREATION_FAILED: new RequestError("Failed to create product formula", 60013, 500),
+    FORMULA_UPDATE_FAILED: new RequestError("Failed to update product formula", 60014, 500),
+    FORMULA_DELETION_FAILED: new RequestError("Failed to delete product formula", 60015, 500),
+    COMPONENT_UPDATE_FAILED: new RequestError("Failed to update formula component", 60016, 500),
+    COMPONENT_REMOVAL_FAILED: new RequestError("Failed to remove component from formula", 60017, 500),
+    PRODUCT_FORMULA_NAME_EXISTS: new RequestError("Formula with this name already exists", 60018, 409),
+    FORMULA_IN_USE: new RequestError("This formula is in use by one or more products and cannot be deleted", 60019, 400),
+    FORMULA_ATTACHED_TO_PRODUCT: new RequestError("This product has a formula attached and cannot be deleted", 60020, 400),
+    PRODUCT_NAME_EXISTS: new RequestError("Product with this name already exists", 30005, 409), // Alias for DUPLICATE_PRODUCT_NAME
     
     // Inventory Entries Errors (7xxxx)
     INVENTORY_ENTRY_NOT_FOUND: new RequestError("Inventory entry not found", 70001, 404),
@@ -144,6 +149,11 @@ export const ERRORS = {
     INVENTORY_ENTRY_LOCATION_REQUIRED: new RequestError("Location is required for inventory entry", 70008, 400),
     INVENTORY_ENTRY_TYPE_REQUIRED: new RequestError("Entry type is required", 70009, 400),
     INVENTORY_BALANCE_RETRIEVAL_FAILED: new RequestError("Failed to retrieve inventory balance", 70010, 500),
+    INSUFFICIENT_COMPONENT_INVENTORY: new RequestError("Insufficient inventory for one or more formula components", 70011, 400),
+    PRODUCT_REQUIRED: new RequestError("Product is required for inventory entry", 70007, 400), // Alias for INVENTORY_ENTRY_PRODUCT_REQUIRED
+    QUANTITY_REQUIRED: new RequestError("Inventory quantity must be a non-zero number", 70006, 400), // Alias for INVENTORY_ENTRY_INVALID_QUANTITY
+    ENTRY_TYPE_REQUIRED: new RequestError("Entry type is required", 70009, 400), // Alias for INVENTORY_ENTRY_TYPE_REQUIRED
+    LOCATION_REQUIRED: new RequestError("Location is required for inventory entry", 70008, 400), // Alias for INVENTORY_ENTRY_LOCATION_REQUIRED
     
     // Audit Log Errors (8xxxx)
     AUDIT_LOG_NOT_FOUND: new RequestError("Audit log not found", 80001, 404), 

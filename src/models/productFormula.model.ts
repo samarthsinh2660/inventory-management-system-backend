@@ -3,48 +3,54 @@ import { RowDataPacket } from "mysql2";
 export const PRODUCT_FORMULA_TABLE = `
 CREATE TABLE ProductFormula (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    product_id INT NOT NULL,
-    component_id INT NOT NULL,
-    quantity FLOAT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description VARCHAR(255),
+    components JSON NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (product_id) REFERENCES Products(id) ON DELETE RESTRICT,
-    FOREIGN KEY (component_id) REFERENCES Products(id) ON DELETE RESTRICT,
-    CHECK (product_id <> component_id)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )
 `;
 
+export interface FormulaComponent {
+  id: number;
+  component_id: number;
+  component_name?: string;
+  quantity: number;
+}
+
 export interface ProductFormula extends RowDataPacket {
   id: number;
-  product_id: number;
-  component_id: number;
-  quantity: number;
+  name: string;
+  description: string | null;
+  components: FormulaComponent[];
   created_at?: Date;
   updated_at?: Date;
 }
 
 /**
- * Extended ProductFormula with joined product/component names
+ * Type for formula component data
  */
-export interface ProductFormulaWithNames extends ProductFormula {
-  product_name?: string;
+export interface FormulaComponentData {
+  id?: number;
+  component_id: number;
   component_name?: string;
-  component_unit?: string;
+  quantity: number;
 }
 
 /**
  * Type for product formula creation parameters
  */
 export interface ProductFormulaCreateParams {
-  product_id: number;
-  component_id: number;
-  quantity: number;
+  name: string;
+  description?: string;
+  components: FormulaComponentData[];
 }
 
 /**
  * Type for product formula update parameters
  */
 export interface ProductFormulaUpdateParams {
-  quantity?: number;
-  component_id?: number;
+  name?: string;
+  description?: string;
+  components?: FormulaComponentData[];
 }

@@ -4,7 +4,7 @@ import { productRepository } from '../repositories/product.repository.ts';
 import { ERRORS } from '../utils/error.ts';
 import { successResponse, listResponse, createdResponse, updatedResponse, deletedResponse } from '../utils/response.ts';
 import { ProductCategory } from '../models/products.model.ts';
-import { ProductFormulaCreateParams, ProductFormulaUpdateParams } from '../models/productFormula.model.ts';
+import { FormulaComponentData, ProductFormulaCreateParams, ProductFormulaUpdateParams } from '../models/productFormula.model.ts';
 
 /**
  * Get all product formulas
@@ -19,93 +19,102 @@ export const getAllFormulas = async (req: Request, res: Response, next: NextFunc
 };
 
 /**
- * Get formula components for a specific product
+ * Get formula by ID
  */
-export const getFormulaByProductId = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const getFormulaById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const productId = parseInt(req.params.productId, 10);
+    const formulaId = parseInt(req.params.id, 10);
     
-    if (isNaN(productId)) {
+    if (isNaN(formulaId)) {
       throw ERRORS.INVALID_PARAMS;
     }
     
-    // Check if product exists
-    const product = await productRepository.findById(productId);
-    if (!product) {
-      throw ERRORS.PRODUCT_NOT_FOUND;
+    const formula = await productFormulaRepository.findById(formulaId);
+    
+    if (!formula) {
+      throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
     }
     
-    // Get formula components
-    const formulaComponents = await productFormulaRepository.getByProductId(productId);
-    
-    res.json(listResponse(formulaComponents, 'Product formula retrieved successfully'));
+    res.json(successResponse(formula, 'Product formula retrieved successfully'));
   } catch (error: unknown) {
     next(error);
   }
 };
 
 /**
- * Add component to product formula
+ * Get products using a specific formula
  */
-export const addFormulaComponent = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const getProductsByFormulaId = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { product_id, component_id, quantity } = req.body;
+    const formulaId = parseInt(req.params.id, 10);
+    
+    if (isNaN(formulaId)) {
+      throw ERRORS.INVALID_PARAMS;
+    }
+    
+    // Check if formula exists
+    const formula = await productFormulaRepository.findById(formulaId);
+    if (!formula) {
+      throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
+    }
+    
+    const products = await productFormulaRepository.getProductsUsingFormula(formulaId);
+    
+    res.json(listResponse(products, 'Products using formula retrieved successfully'));
+  } catch (error: unknown) {
+    next(error);
+  }
+};
+
+/**
+ * Create a new product formula
+ */
+export const createFormula = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { name, description, components } = req.body;
     
     // Basic validation
-    if (!product_id) {
+    if (!name) {
       throw ERRORS.PARENT_PRODUCT_REQUIRED;
     }
     
-    if (!component_id) {
+    if (!components || !Array.isArray(components) || components.length === 0) {
       throw ERRORS.COMPONENT_PRODUCT_REQUIRED;
     }
     
-    if (quantity === undefined || isNaN(Number(quantity)) || Number(quantity) <= 0) {
-      throw ERRORS.FORMULA_QUANTITY_INVALID;
-    }
-    
-    // Check if parent product exists and verify it's not a raw material
-    const parentProduct = await productRepository.findById(Number(product_id));
-    if (!parentProduct) {
-      throw ERRORS.PRODUCT_NOT_FOUND;
-    }
-    
-    if (parentProduct.category === ProductCategory.RAW) {
-      throw ERRORS.INVALID_FORMULA_FOR_RAW_MATERIAL;
-    }
-    
-    // Check if component product exists
-    const componentProduct = await productRepository.findById(Number(component_id));
-    if (!componentProduct) {
-      throw ERRORS.PRODUCT_NOT_FOUND;
-    }
-    
-    // Check if component already exists in the formula
-    const existingComponents = await productFormulaRepository.getByProductId(Number(product_id));
-    const componentExists = existingComponents.some(comp => comp.component_id === Number(component_id));
-    if (componentExists) {
-      throw ERRORS.COMPONENT_ALREADY_EXISTS;
+    // Validate each component
+    for (const component of components) {
+      if (!component.component_id) {
+        throw ERRORS.COMPONENT_PRODUCT_REQUIRED;
+      }
+      
+      if (component.quantity === undefined || isNaN(Number(component.quantity)) || Number(component.quantity) <= 0) {
+        throw ERRORS.FORMULA_QUANTITY_INVALID;
+      }
+      
+      // Check if component product exists
+      const componentProduct = await productRepository.findById(Number(component.component_id));
+      if (!componentProduct) {
+        throw ERRORS.FORMULA_COMPONENT_NOT_FOUND;
+      }
     }
     
     try {
-      // Create formula component
+      // Create formula
       const formulaData: ProductFormulaCreateParams = {
-        product_id: Number(product_id),
-        component_id: Number(component_id),
-        quantity: Number(quantity)
+        name,
+        description,
+        components: components.map(c => ({
+          component_id: Number(c.component_id),
+          quantity: Number(c.quantity)
+        }))
       };
       
-      const formulaComponent = await productFormulaRepository.addComponent(formulaData);
+      const formula = await productFormulaRepository.create(formulaData);
       
-      res.status(201).json(createdResponse(formulaComponent, 'Formula component added successfully'));
+      res.status(201).json(createdResponse(formula, 'Product formula created successfully'));
     } catch (error: unknown) {
-      if ((error as Error).message?.includes('circular dependency')) {
-        throw ERRORS.CIRCULAR_DEPENDENCY_ERROR;
-      } else if ((error as Error).message?.includes('self reference')) {
-        throw ERRORS.SELF_REFERENCE_ERROR;
-      } else {
-        throw ERRORS.FORMULA_CREATION_FAILED;
-      }
+      throw ERRORS.FORMULA_CREATION_FAILED;
     }
   } catch (error: unknown) {
     next(error);
@@ -113,35 +122,68 @@ export const addFormulaComponent = async (req: Request, res: Response, next: Nex
 };
 
 /**
- * Update formula component quantity
+ * Update a product formula
  */
-export const updateFormulaComponent = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const updateFormula = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const componentId = parseInt(req.params.id, 10);
-    const { quantity } = req.body;
+    const formulaId = parseInt(req.params.id, 10);
+    const { name, description, components } = req.body;
     
-    if (isNaN(componentId)) {
+    if (isNaN(formulaId)) {
       throw ERRORS.INVALID_PARAMS;
     }
     
-    if (quantity === undefined || isNaN(Number(quantity)) || Number(quantity) <= 0) {
-      throw ERRORS.FORMULA_QUANTITY_INVALID;
+    // Check if formula exists
+    const existingFormula = await productFormulaRepository.findById(formulaId);
+    if (!existingFormula) {
+      throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
     }
     
-    // Check if formula component exists
-    const existingComponent = await productFormulaRepository.findById(componentId);
-    if (!existingComponent) {
-      throw ERRORS.FORMULA_COMPONENT_NOT_FOUND;
+    // Validate components if provided
+    if (components) {
+      if (!Array.isArray(components) || components.length === 0) {
+        throw ERRORS.COMPONENT_PRODUCT_REQUIRED;
+      }
+      
+      for (const component of components) {
+        if (!component.component_id) {
+          throw ERRORS.COMPONENT_PRODUCT_REQUIRED;
+        }
+        
+        if (component.quantity === undefined || isNaN(Number(component.quantity)) || Number(component.quantity) <= 0) {
+          throw ERRORS.FORMULA_QUANTITY_INVALID;
+        }
+        
+        // Check if component product exists
+        const componentProduct = await productRepository.findById(Number(component.component_id));
+        if (!componentProduct) {
+          throw ERRORS.PRODUCT_NOT_FOUND;
+        }
+      }
     }
     
     try {
-      const updateData: ProductFormulaUpdateParams = {
-        quantity: Number(quantity)
-      };
+      const updateData: ProductFormulaUpdateParams = {};
       
-      const updatedComponent = await productFormulaRepository.updateComponent(componentId, updateData);
+      if (name !== undefined) {
+        updateData.name = name;
+      }
       
-      res.json(updatedResponse(updatedComponent, 'Formula component updated successfully'));
+      if (description !== undefined) {
+        updateData.description = description;
+      }
+      
+      if (components !== undefined) {
+        updateData.components = components.map((c: any) => ({
+          id: c.id, // Preserve existing IDs if they exist
+          component_id: Number(c.component_id),
+          quantity: Number(c.quantity)
+        }));
+      }
+      
+      const updatedFormula = await productFormulaRepository.update(formulaId, updateData);
+      
+      res.json(updatedResponse(updatedFormula, 'Product formula updated successfully'));
     } catch (error: unknown) {
       throw ERRORS.FORMULA_UPDATE_FAILED;
     }
@@ -151,9 +193,9 @@ export const updateFormulaComponent = async (req: Request, res: Response, next: 
 };
 
 /**
- * Delete formula component
+ * Delete a product formula
  */
-export const deleteFormulaComponent = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const deleteFormula = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const formulaId = parseInt(req.params.id, 10);
     
@@ -161,18 +203,22 @@ export const deleteFormulaComponent = async (req: Request, res: Response, next: 
       throw ERRORS.INVALID_PARAMS;
     }
     
-    // Check if formula component exists
-    const formulaComponent = await productFormulaRepository.findById(formulaId);
-    if (!formulaComponent) {
-      throw ERRORS.FORMULA_COMPONENT_NOT_FOUND;
+    // Check if formula exists
+    const formula = await productFormulaRepository.findById(formulaId);
+    if (!formula) {
+      throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
     }
     
     try {
-      await productFormulaRepository.deleteComponent(formulaId);
+      await productFormulaRepository.delete(formulaId);
       
-      res.json(deletedResponse('Formula component deleted successfully'));
+      res.json(deletedResponse('Product formula deleted successfully'));
     } catch (error: unknown) {
-      throw ERRORS.FORMULA_DELETION_FAILED;
+      if ((error as any)?.code === ERRORS.FORMULA_IN_USE?.code) {
+        throw ERRORS.FORMULA_IN_USE;
+      } else {
+        throw ERRORS.FORMULA_DELETION_FAILED;
+      }
     }
   } catch (error: unknown) {
     next(error);
@@ -180,28 +226,84 @@ export const deleteFormulaComponent = async (req: Request, res: Response, next: 
 };
 
 /**
- * Clear all components for a product (clear formula)
+ * Add or update a component in a formula
  */
-export const clearProductFormula = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const updateFormulaComponent = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const productId = parseInt(req.params.productId, 10);
+    const formulaId = parseInt(req.params.id, 10);
+    const { component_id, quantity, id } = req.body;
     
-    if (isNaN(productId)) {
+    if (isNaN(formulaId)) {
       throw ERRORS.INVALID_PARAMS;
     }
     
-    // Check if product exists
-    const product = await productRepository.findById(productId);
-    if (!product) {
+    // Basic validation
+    if (!component_id) {
+      throw ERRORS.COMPONENT_PRODUCT_REQUIRED;
+    }
+    
+    if (quantity === undefined || isNaN(Number(quantity)) || Number(quantity) <= 0) {
+      throw ERRORS.FORMULA_QUANTITY_INVALID;
+    }
+    
+    // Check if formula exists
+    const formula = await productFormulaRepository.findById(formulaId);
+    if (!formula) {
+      throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
+    }
+    
+    // Check if component product exists
+    const componentProduct = await productRepository.findById(Number(component_id));
+    if (!componentProduct) {
       throw ERRORS.PRODUCT_NOT_FOUND;
     }
     
     try {
-      await productFormulaRepository.clearProductFormula(productId);
+      const componentData: FormulaComponentData = {
+        id: id ? Number(id) : undefined,
+        component_id: Number(component_id),
+        quantity: Number(quantity)
+      };
       
-      res.json(successResponse(null, 'Product formula cleared successfully'));
+      const updatedFormula = await productFormulaRepository.updateFormulaComponent(formulaId, componentData);
+      
+      res.json(updatedResponse(updatedFormula, 'Formula component updated successfully'));
     } catch (error: unknown) {
-      throw ERRORS.FORMULA_DELETION_FAILED;
+      throw ERRORS.COMPONENT_UPDATE_FAILED;
+    }
+  } catch (error: unknown) {
+    next(error);
+  }
+};
+
+/**
+ * Remove a component from a formula
+ */
+export const removeFormulaComponent = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const formulaId = parseInt(req.params.formulaId, 10);
+    const componentId = parseInt(req.params.componentId, 10);
+    
+    if (isNaN(formulaId) || isNaN(componentId)) {
+      throw ERRORS.INVALID_PARAMS;
+    }
+    
+    // Check if formula exists
+    const formula = await productFormulaRepository.findById(formulaId);
+    if (!formula) {
+      throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
+    }
+    
+    try {
+      const updatedFormula = await productFormulaRepository.removeFormulaComponent(formulaId, componentId);
+      
+      res.json(updatedResponse(updatedFormula, 'Formula component removed successfully'));
+    } catch (error: unknown) {
+      if ((error as any)?.code === ERRORS.FORMULA_COMPONENT_NOT_FOUND?.code) {
+        throw ERRORS.FORMULA_COMPONENT_NOT_FOUND;
+      } else {
+        throw ERRORS.COMPONENT_REMOVAL_FAILED;
+      }
     }
   } catch (error: unknown) {
     next(error);

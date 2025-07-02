@@ -8,7 +8,9 @@ import {
 import { ERRORS, handleUnknownError } from '../utils/error.ts';
 import inventoryEntryRepository from '../repositories/inventoryEntry.repository.ts';
 import auditLogRepository from '../repositories/auditLog.repository.ts';
-import { InventoryEntryCreateParams, InventoryEntryUpdateParams } from '../models/inventoryEntries.model.ts';
+import { InventoryEntryUpdateParams } from '../models/inventoryEntries.model.ts';
+import { productRepository } from '../repositories/product.repository.ts';
+import { productFormulaRepository } from '../repositories/productFormula.repository.ts';
 
 /**
  * Get all inventory entries with pagination
@@ -154,19 +156,19 @@ export const createEntry = async (req: Request , res: Response): Promise<void> =
       res.status(400).json({
         success: false,
         error: {
-          code: ERRORS.INVENTORY_ENTRY_PRODUCT_REQUIRED.code,
-          message: ERRORS.INVENTORY_ENTRY_PRODUCT_REQUIRED.message
+          code: ERRORS.PRODUCT_REQUIRED.code,
+          message: ERRORS.PRODUCT_REQUIRED.message
         }
       });
       return;
     }
     
-    if (quantity === undefined || quantity === null || quantity === 0) {
+    if (quantity === undefined || isNaN(Number(quantity))) {
       res.status(400).json({
         success: false,
         error: {
-          code: ERRORS.INVENTORY_ENTRY_INVALID_QUANTITY.code,
-          message: ERRORS.INVENTORY_ENTRY_INVALID_QUANTITY.message
+          code: ERRORS.QUANTITY_REQUIRED.code,
+          message: ERRORS.QUANTITY_REQUIRED.message
         }
       });
       return;
@@ -176,8 +178,8 @@ export const createEntry = async (req: Request , res: Response): Promise<void> =
       res.status(400).json({
         success: false,
         error: {
-          code: ERRORS.INVENTORY_ENTRY_TYPE_REQUIRED.code,
-          message: ERRORS.INVENTORY_ENTRY_TYPE_REQUIRED.message
+          code: ERRORS.ENTRY_TYPE_REQUIRED.code,
+          message: ERRORS.ENTRY_TYPE_REQUIRED.message
         }
       });
       return;
@@ -187,8 +189,8 @@ export const createEntry = async (req: Request , res: Response): Promise<void> =
       res.status(400).json({
         success: false,
         error: {
-          code: ERRORS.INVENTORY_ENTRY_LOCATION_REQUIRED.code,
-          message: ERRORS.INVENTORY_ENTRY_LOCATION_REQUIRED.message
+          code: ERRORS.LOCATION_REQUIRED.code,
+          message: ERRORS.LOCATION_REQUIRED.message
         }
       });
       return;
@@ -206,26 +208,74 @@ export const createEntry = async (req: Request , res: Response): Promise<void> =
       return;
     }
     
-    const user_id = req.user.id;
+    // Special handling for manufacturing products with formulas
+    if (entry_type === 'manufacturing_in') {
+      // Get the product to check if it has a formula
+      const product = await productRepository.findById(Number(product_id));
+      
+      if (product && product.product_formula_id) {
+        // Get the formula with its components
+        const formula = await productFormulaRepository.findById(product.product_formula_id);
+        
+        if (formula && formula.components && formula.components.length > 0) {
+          // Start a transaction to handle the parent product addition and component deductions
+          const entryResult = await inventoryEntryRepository.createWithFormulaComponents(
+            {
+              product_id: Number(product_id),
+              quantity: Number(quantity),
+              entry_type,
+              user_id: req.user?.id || 0, // Use 0 as fallback for system-generated entries
+              location_id: Number(location_id),
+              notes,
+              reference_id
+            },
+            formula.components,
+            Number(quantity)
+          );
+          
+          // Create audit logs for the main product and all component entries
+          await Promise.all([
+            auditLogRepository.logCreate(
+              entryResult.mainEntry.id,
+              entryResult.mainEntry,
+              req.user?.id || 0, // Use 0 as fallback for system-generated entries
+              req.body.reason
+            ),
+            ...entryResult.componentEntries.map(entry => 
+              auditLogRepository.logCreate(
+                entry.id,
+                entry,
+                req.user?.id || 0, // Use 0 as fallback for system-generated entries
+                `Auto-deducted component for manufacturing product ID ${product_id}`
+              )
+            )
+          ]);
+          
+          res.status(201).json(createdResponse({
+            mainEntry: entryResult.mainEntry,
+            componentEntries: entryResult.componentEntries
+          }, 'Inventory entry created with formula component deductions'));
+          return;
+        }
+      }
+    }
     
-    // Create the entry
-    const entryData: InventoryEntryCreateParams = {
-      product_id,
-      quantity,
+    // Regular entry creation (no formula handling)
+    const entry = await inventoryEntryRepository.create({
+      product_id: Number(product_id),
+      quantity: Number(quantity),
       entry_type,
-      user_id,
-      location_id,
+      user_id: req.user?.id,
+      location_id: Number(location_id),
       notes,
       reference_id
-    };
-    
-    const entry = await inventoryEntryRepository.create(entryData);
+    });
     
     // Create audit log for this operation
     await auditLogRepository.logCreate(
       entry.id,
-      entryData,
-      user_id,
+      entry,
+      req.user?.id || 0, // Use 0 as fallback for system-generated entries
       req.body.reason
     );
     
@@ -311,7 +361,7 @@ export const updateEntry = async (req: Request, res: Response): Promise<void> =>
       entryId,
       existingEntry,
       updatedEntry,
-      req.user.id,
+      req.user?.id || 0, // Use 0 as fallback for system-generated entries
       req.body.reason
     );
     
@@ -377,7 +427,7 @@ export const deleteEntry = async (req: Request , res: Response): Promise<void> =
     // Check permissions:
     // - Master users can delete any entry
     // - Employee users can only delete entries they created
-    if (!req.user.is_master && entry.user_id !== req.user.id) {
+    if (!req.user.is_master && entry.user_id !== req.user?.id) {
       res.status(403).json({
         success: false,
         error: {
@@ -395,7 +445,7 @@ export const deleteEntry = async (req: Request , res: Response): Promise<void> =
     await auditLogRepository.logDelete(
       entryId,
       entry,
-      req.user.id,
+      req.user?.id || 0, // Use 0 as fallback for system-generated entries
       req.body.reason
     );
     

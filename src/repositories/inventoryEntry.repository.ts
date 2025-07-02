@@ -8,6 +8,7 @@ import {
   ProductBalance,
   InventoryBalance
 } from "../models/inventoryEntries.model.ts";
+import { FormulaComponentData } from "../models/productFormula.model.ts";
 
 export class InventoryEntryRepository {
   
@@ -370,6 +371,126 @@ export class InventoryEntryRepository {
     } catch (error) {
       console.error(`Error finding inventory entries for product ${productId}:`, error);
       throw ERRORS.DATABASE_ERROR;
+    }
+  }
+  
+  /**
+   * Creates a new inventory entry with component deductions based on formula
+   * @param mainEntryData The main product inventory entry
+   * @param formulaComponents The components from the formula
+   * @param productionQuantity The quantity of the main product being produced
+   * @returns Object containing the main entry and all component entries
+   */
+  async createWithFormulaComponents(
+    mainEntryData: InventoryEntryCreateParams, 
+    formulaComponents: FormulaComponentData[],
+    productionQuantity: number
+  ): Promise<{ mainEntry: InventoryEntry, componentEntries: InventoryEntry[] }> {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+      
+      // First, verify that all components have sufficient inventory to be deducted
+      for (const component of formulaComponents) {
+        // Calculate how much of this component will be used
+        const componentQuantity = component.quantity * productionQuantity;
+        
+        // Check if there's enough inventory for this component
+        const [currentBalance] = await connection.execute<RowDataPacket[]>(`
+          SELECT COALESCE(SUM(quantity), 0) as current_balance 
+          FROM InventoryEntries 
+          WHERE product_id = ? AND location_id = ?
+        `, [component.component_id, mainEntryData.location_id]);
+        
+        const balance = currentBalance[0]?.current_balance || 0;
+        if (balance - componentQuantity < 0) {
+          throw {
+            ...ERRORS.INSUFFICIENT_COMPONENT_INVENTORY,
+            message: `Insufficient inventory for component ${component.component_name || component.component_id}. Required: ${componentQuantity}, Available: ${balance}`
+          };
+        }
+      }
+      
+      // Insert the main product entry (the manufactured product)
+      const [mainResult] = await connection.execute<ResultSetHeader>(`
+        INSERT INTO InventoryEntries 
+        (product_id, quantity, entry_type, user_id, location_id, notes, reference_id) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `, [
+        mainEntryData.product_id,
+        mainEntryData.quantity,
+        mainEntryData.entry_type,
+        mainEntryData.user_id,
+        mainEntryData.location_id,
+        mainEntryData.notes || null,
+        mainEntryData.reference_id || null
+      ]);
+      
+      const mainEntryId = mainResult.insertId;
+      
+      // Now create entries for each component (deducting them from inventory)
+      const componentEntryIds: number[] = [];
+      
+      for (const component of formulaComponents) {
+        // Calculate how much of this component will be used
+        const componentQuantity = component.quantity * productionQuantity;
+        
+        // Create entry for component deduction (negative quantity for deduction)
+        const [componentResult] = await connection.execute<ResultSetHeader>(`
+          INSERT INTO InventoryEntries 
+          (product_id, quantity, entry_type, user_id, location_id, notes, reference_id) 
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `, [
+          component.component_id,
+          -componentQuantity, // Negative quantity for deduction
+          'manufacturing_out', // Special type for formula component deductions
+          mainEntryData.user_id,
+          mainEntryData.location_id,
+          `Auto-deducted for manufacturing product ID ${mainEntryData.product_id}`,
+          mainEntryId // Reference to the main entry
+        ]);
+        
+        componentEntryIds.push(componentResult.insertId);
+      }
+      
+      // Commit all changes
+      await connection.commit();
+      
+      // Retrieve all created entries
+      const mainEntry = await this.findById(mainEntryId) as InventoryEntry;
+      
+      const componentEntries: InventoryEntry[] = [];
+      for (const id of componentEntryIds) {
+        const entry = await this.findById(id) as InventoryEntry;
+        componentEntries.push(entry);
+      }
+      
+      // After successfully creating entries, check if there are any threshold alerts
+      // Do this outside the transaction to avoid slowing down the main operation
+      setImmediate(() => {
+        import('../services/alert.service.ts')
+          .then(alertService => {
+            // Check threshold alerts for all affected products
+            alertService.default.checkAndSendAlerts();
+          })
+          .catch(error => {
+            console.error("Error checking stock thresholds:", error);
+          });
+      });
+      
+      return { mainEntry, componentEntries };
+    } catch (error) {
+      await connection.rollback();
+      console.error("Error creating inventory entry with formula components:", error);
+      
+      if (error === ERRORS.INSUFFICIENT_COMPONENT_INVENTORY || 
+          (error as any)?.code === ERRORS.INSUFFICIENT_COMPONENT_INVENTORY.code) {
+        throw error;
+      }
+      
+      throw ERRORS.INVENTORY_ENTRY_CREATION_FAILED;
+    } finally {
+      connection.release();
     }
   }
 }
