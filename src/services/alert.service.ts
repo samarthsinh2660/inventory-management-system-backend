@@ -166,7 +166,7 @@ class AlertService {
         // First check if we already have unread notifications for this product
         const [existingNotifications] = await db.execute<RowDataPacket[]>(
           `SELECT id FROM Notifications 
-           WHERE product_id = ?`,
+           WHERE product_id = ? AND is_read = false`,
           [product.id]
         );
         
@@ -175,32 +175,29 @@ class AlertService {
           continue;
         }
         
-        // Create a single notification for the product (for the first master user if any)
-        if (masterUsers.length > 0) {
-          const message = `Low stock alert: ${product.name} is below minimum threshold (${product.current_stock}/${product.min_stock_threshold})`;
-          
-          // First get the corresponding stock alert if available
-          const [stockAlerts] = await db.execute<RowDataPacket[]>(
-            'SELECT id FROM StockAlerts WHERE product_id = ? AND is_resolved = false',
-            [product.id]
-          );
-          
-          const stock_alert_id = stockAlerts.length > 0 ? stockAlerts[0].id : null;
-          
-          await db.execute(
-            `INSERT INTO Notifications (
-              user_id, product_id, stock_alert_id, message, current_stock, min_threshold
-            ) VALUES (?, ?, ?, ?, ?, ?)`,
-            [
-              masterUsers[0].id,
-              product.id,
-              stock_alert_id,
-              message,
-              product.current_stock,
-              product.min_stock_threshold
-            ]
-          );
-        }
+        // Create a single notification for the product (visible to all master users)
+        const message = `Low stock alert: ${product.name} is below minimum threshold (${product.current_stock}/${product.min_stock_threshold})`;
+        
+        // First get the corresponding stock alert if available
+        const [stockAlerts] = await db.execute<RowDataPacket[]>(
+          'SELECT id FROM StockAlerts WHERE product_id = ? AND is_resolved = false',
+          [product.id]
+        );
+        
+        const stock_alert_id = stockAlerts.length > 0 ? stockAlerts[0].id : null;
+        
+        await db.execute(
+          `INSERT INTO Notifications (
+            product_id, stock_alert_id, message, current_stock, min_threshold
+          ) VALUES (?, ?, ?, ?, ?)`,
+          [
+            product.id,
+            stock_alert_id,
+            message,
+            product.current_stock,
+            product.min_stock_threshold
+          ]
+        );
       }
     } catch (error) {
       console.error("Error creating in-app notifications:", error);

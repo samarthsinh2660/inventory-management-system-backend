@@ -9,10 +9,11 @@ export class ProductRepository {
    */
   async findById(id: number): Promise<Product | null> {
     const [products] = await db.execute(
-      `SELECT p.*, s.name as subcategory_name, l.name as location_name 
+      `SELECT p.*, s.name as subcategory_name, l.name as location_name, pf.name as product_formula_name
        FROM Products p
        JOIN Subcategories s ON p.subcategory_id = s.id
        JOIN Locations l ON p.location_id = l.id
+       LEFT JOIN ProductFormula pf ON p.product_formula_id = pf.id
        WHERE p.id = ?`,
       [id]
     ) as [Product[], any];
@@ -25,7 +26,7 @@ export class ProductRepository {
    */
   async findByName(name: string): Promise<Product | null> {
     const [products] = await db.execute(
-      `SELECT p.*, s.name as subcategory_name, l.name as location_name 
+      `SELECT p.*, s.name as subcategory_name, l.name as location_name
        FROM Products p
        JOIN Subcategories s ON p.subcategory_id = s.id
        JOIN Locations l ON p.location_id = l.id
@@ -41,10 +42,11 @@ export class ProductRepository {
    */
   async getAllProducts(): Promise<Product[]> {
     const [products] = await db.execute(
-      `SELECT p.*, s.name as subcategory_name, l.name as location_name 
+      `SELECT p.*, s.name as subcategory_name, l.name as location_name, pf.name as product_formula_name
        FROM Products p
        JOIN Subcategories s ON p.subcategory_id = s.id
        JOIN Locations l ON p.location_id = l.id
+       LEFT JOIN ProductFormula pf ON p.product_formula_id = pf.id
        ORDER BY p.name`
     ) as [Product[], any];
 

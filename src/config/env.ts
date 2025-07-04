@@ -31,3 +31,8 @@ export const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
 
 //cors
 export const CORS_ORIGIN = process.env.CORS_ORIGIN;
+export const CORS_ORIGIN1 = process.env.CORS_ORIGIN1;
+export const CORS_ORIGIN2 = process.env.CORS_ORIGIN2;
+export const CORS_ORIGIN3 = process.env.CORS_ORIGIN3;
+export const CORS_ORIGIN4 = process.env.CORS_ORIGIN4;
+export const CORS_ORIGIN5 = process.env.CORS_ORIGIN5;

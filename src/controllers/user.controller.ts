@@ -112,10 +112,10 @@ export const updateUser = async (req: Request, res: Response, next: NextFunction
             throw ERRORS.RESOURCE_NOT_FOUND;
         }
         
-        const { name, email, role } = req.body;
+        const { name, email, role, username, password } = req.body;
         
         // At least one field to update
-        if (!name && !email && !role) {
+        if (!name && !email && !role && !username && !password) {
             throw ERRORS.VALIDATION_ERROR;
         }
         
@@ -128,13 +128,31 @@ export const updateUser = async (req: Request, res: Response, next: NextFunction
         if (req.user && userId === req.user.id && role && role !== user.role) {
             throw ERRORS.CANNOT_CHANGE_OWN_ROLE;
         }
+
+        // Check for username uniqueness if updating username
+        if (username) {
+            const existingUser = await userRepository.findByUsername(username);
+            if (existingUser && existingUser.id !== userId) {
+                throw ERRORS.RESOURCE_ALREADY_EXISTS;
+            }
+        }
         
-        // Update user
-        const updatedUser = await userRepository.updateUserInfo(userId, {
+        // Prepare update data
+        const updateData: any = {
             name,
             email,
-            role
-        });
+            role,
+            username
+        };
+        
+        // Hash password if provided
+        if (password) {
+            const saltRounds = 12;
+            updateData.password = await bcrypt.hash(password, saltRounds);
+        }
+        
+        // Update user
+        const updatedUser = await userRepository.updateUserInfo(userId, updateData);
         
         res.json(successResponse(updatedUser, 'User updated successfully'));
     } catch (error) {

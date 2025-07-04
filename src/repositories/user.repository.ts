@@ -145,9 +145,11 @@ export class UserRepository {
       name?: string;
       email?: string;
       role?: string;
+      username?: string;
+      password?: string;
     }
   ): Promise<User | null> {
-    const { name, email, role } = userData;
+    const { name, email, role, username, password } = userData;
     
     // Build dynamic update query
     let query = 'UPDATE Users SET ';
@@ -166,6 +168,16 @@ export class UserRepository {
     if (role !== undefined) {
       query += 'role = ?, ';
       params.push(role);
+    }
+
+    if (username !== undefined) {
+      query += 'username = ?, ';
+      params.push(username);
+    }
+    
+    if (password !== undefined) {
+      query += 'password = ?, ';
+      params.push(password);
     }
     
     // Remove trailing comma and space

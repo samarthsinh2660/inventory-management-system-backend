@@ -1,6 +1,6 @@
 import express, { Application, Request, Response } from "express";
 import cors from "cors";
-import { PORT, CORS_ORIGIN } from "./config/env.ts";
+import { PORT, CORS_ORIGIN, CORS_ORIGIN1, CORS_ORIGIN2, CORS_ORIGIN3, CORS_ORIGIN4, CORS_ORIGIN5 } from "./config/env.ts";
 import cookieParser from "cookie-parser";
 import { connectToDatabase } from "./database/db.ts";
 import { limiter } from "./middleware/ratelimit.middleware.ts";
@@ -14,6 +14,7 @@ import InventoryEntryRouter from "./routes/inventoryEntry.route.ts";
 import AuditLogRouter from "./routes/auditLog.route.ts";
 import AlertRouter from "./routes/alert.route.ts"; // Add this line
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware.ts";
+import NotificationRouter from "./routes/notification.route.ts";
 
 async function start(){
 const app: Application = express()
@@ -22,7 +23,15 @@ const app: Application = express()
 app.use(limiter);
 
 // Middleware
-app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
+app.use(cors({ origin: [
+  CORS_ORIGIN as string,
+      CORS_ORIGIN1 as string,
+      CORS_ORIGIN2 as string,
+      CORS_ORIGIN3 as string,
+      CORS_ORIGIN4 as string,
+      CORS_ORIGIN5 as string,
+],
+   credentials: true }));
 app.use(express.json());
 
 
@@ -54,7 +63,7 @@ app.use('/api/product-formulas', ProductFormulaRouter);
 app.use('/api/inventory', InventoryEntryRouter);
 app.use('/api/audit-logs', AuditLogRouter);
 app.use('/api/alerts', AlertRouter); // Add this line
-
+app.use('/api/notifications', NotificationRouter); // Add this line
 //erros 
 app.use(notFoundHandler);
 app.use(errorHandler);
