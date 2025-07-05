@@ -69,7 +69,7 @@ export const ERRORS = {
     CANNOT_CHANGE_OWN_ROLE: new RequestError("Cannot change your own role", 11004, 403),
     USERNAME_ALREADY_EXISTS: new RequestError("Username already exists", 11005, 409),
     EMAIL_ALREADY_EXISTS: new RequestError("Email already exists", 11006, 409),
-    
+    USER_NOT_FOUND: new RequestError("User not found", 11007, 404),
     // Authentication & Authorization Errors (2xxxx)
     NO_TOKEN_PROVIDED: new RequestError("No authentication token provided", 20001, 401),
     INVALID_AUTH_TOKEN: new RequestError("Invalid authentication token", 20002, 401),

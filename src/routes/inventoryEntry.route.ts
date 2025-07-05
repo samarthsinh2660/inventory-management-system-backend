@@ -6,7 +6,8 @@ import {
   createEntry,
   updateEntry,
   deleteEntry,
-  getBalance
+  getBalance,
+  getUserInventoryEntries
 } from '../controllers/inventoryEntry.controller.ts';
 import { authenticate, requireMaster } from '../middleware/auth.middleware.ts';
 
@@ -22,6 +23,10 @@ inventoryEntriesRouter.get('/balance', getBalance);
 // Get all inventory entries with pagination
 // Both master and employee can view entries
 inventoryEntriesRouter.get('/', getAllEntries);
+
+// Get user's inventory entries with username
+// Authenticated users can view their own inventory entries
+inventoryEntriesRouter.get('/user-entries', getUserInventoryEntries);
 
 // Get inventory entries for a specific product
 // Both master and employee can view product's entries
@@ -44,5 +49,6 @@ inventoryEntriesRouter.put('/:id', requireMaster, updateEntry);
 // - Employees can only delete their own entries
 // - Masters can delete any entry
 inventoryEntriesRouter.delete('/:id', deleteEntry);
+
 
 export default inventoryEntriesRouter;

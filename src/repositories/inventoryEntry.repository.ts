@@ -282,23 +282,30 @@ export class InventoryEntryRepository {
   async getBalance(locationId?: number): Promise<InventoryBalance> {
     try {
       let query = `
-        SELECT 
-          p.id as product_id, 
-          p.name as product_name, 
-          COALESCE(SUM(
-            CASE 
-              WHEN ie.entry_type IN ('manual_in', 'manufacturing_in') THEN ie.quantity
-              ELSE -ie.quantity
-            END
-          ), 0) as total_quantity,
-          ie.location_id,
-          l.name as location_name
-        FROM 
-          Products p
-        LEFT JOIN 
-          InventoryEntries ie ON p.id = ie.product_id
-        LEFT JOIN
-          Locations l ON ie.location_id = l.id
+SELECT 
+  p.id AS product_id, 
+  p.name AS product_name, 
+  p.price AS price_per_unit,
+  COALESCE(SUM(
+    CASE 
+      WHEN ie.entry_type IN ('manual_in', 'manufacturing_in') THEN ie.quantity
+      ELSE -ie.quantity
+    END
+  ), 0) AS total_quantity,
+  ROUND(p.price * COALESCE(SUM(
+    CASE 
+      WHEN ie.entry_type IN ('manual_in', 'manufacturing_in') THEN ie.quantity
+      ELSE -ie.quantity
+    END
+  ), 0), 2) AS total_price,
+  ie.location_id,
+  l.name AS location_name
+FROM 
+  Products p
+LEFT JOIN 
+  InventoryEntries ie ON p.id = ie.product_id
+LEFT JOIN
+  Locations l ON ie.location_id = l.id
       `;
       
       const params = [];
@@ -318,7 +325,9 @@ export class InventoryEntryRepository {
       const products = results.map((row: RowDataPacket) => ({
         product_id: row.product_id,
         product_name: row.product_name,
+        price_per_unit: parseFloat(row.price_per_unit) || 0,
         total_quantity: parseFloat(row.total_quantity) || 0,
+        total_price: parseFloat(row.total_price) || 0,
         location_id: row.location_id,
         location_name: row.location_name
       }));
@@ -344,30 +353,51 @@ export class InventoryEntryRepository {
     try {
       const offset = (page - 1) * limit;
       
-      // Use direct integer value for product_id as parameter, but LIMIT and OFFSET inline
-      const numProductId = Number(productId);
+      // First, get the product name
+      const [productResult] = await db.execute<RowDataPacket[]>(
+        'SELECT name FROM Products WHERE id = ?', 
+        [productId]
+      );
       
+      if (!productResult.length) {
+        throw ERRORS.PRODUCT_NOT_FOUND;
+      }
+      
+      const productName = productResult[0].name;
+      
+      // Get inventory entries for this product
       const query = `
-        SELECT ie.*, p.name as product_name, l.name as location_name, u.username
-        FROM InventoryEntries ie
-        JOIN Products p ON ie.product_id = p.id
-        JOIN Locations l ON ie.location_id = l.id
-        JOIN Users u ON ie.user_id = u.id
-        WHERE ie.product_id = ?
-        ORDER BY ie.timestamp DESC
+        SELECT 
+          ie.*,
+          p.name as product_name,
+          l.name as location_name
+        FROM 
+          InventoryEntries ie
+        JOIN
+          Products p ON ie.product_id = p.id
+        JOIN
+          Locations l ON ie.location_id = l.id
+        WHERE 
+          ie.product_id = ?
+        ORDER BY
+          ie.timestamp DESC
         LIMIT ${parseInt(limit.toString())} OFFSET ${parseInt(offset.toString())}
       `;
       
-      const [entries] = await db.execute<InventoryEntry[]>(query, [numProductId]);
+      const [entries] = await db.execute<InventoryEntry[]>(query, [productId]);
       
-      const [countResult] = await db.execute<RowDataPacket[]>(
+      // Get total count for pagination
+      const [totalResult] = await db.execute<RowDataPacket[]>(
         'SELECT COUNT(*) as total FROM InventoryEntries WHERE product_id = ?', 
-        [numProductId]
+        [productId]
       );
       
-      const total = countResult[0]?.total || 0;
+      const total = totalResult[0]?.total || 0;
       
-      return { entries, total };
+      return {
+        entries,
+        total
+      };
     } catch (error) {
       console.error(`Error finding inventory entries for product ${productId}:`, error);
       throw ERRORS.DATABASE_ERROR;
@@ -491,6 +521,82 @@ export class InventoryEntryRepository {
       throw ERRORS.INVENTORY_ENTRY_CREATION_FAILED;
     } finally {
       connection.release();
+    }
+  }
+  
+  /**
+   * Gets inventory entries for a specific user with their username
+   * @param userId The ID of the user
+   * @param page Page number for pagination
+   * @param limit Number of items per page
+   * @returns User inventory entries with username
+   */
+  async getUserInventoryEntries(
+    userId: number,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<{ 
+    username: string, 
+    entries: InventoryEntry[],
+    total: number
+  }> {
+    try {
+      const offset = (page - 1) * limit;
+      
+      // First, get the username
+      const [userResult] = await db.execute<RowDataPacket[]>(
+        'SELECT username FROM Users WHERE id = ?', 
+        [userId]
+      );
+      
+      if (!userResult.length) {
+        throw ERRORS.USER_NOT_FOUND;
+      }
+      
+      const username = userResult[0].username;
+      
+      // Get inventory entries for this user
+      const query = `
+        SELECT 
+          ie.*,
+          p.name as product_name,
+          l.name as location_name
+        FROM 
+          InventoryEntries ie
+        JOIN
+          Products p ON ie.product_id = p.id
+        JOIN
+          Locations l ON ie.location_id = l.id
+        WHERE 
+          ie.user_id = ?
+        ORDER BY
+          ie.timestamp DESC
+        LIMIT ${parseInt(limit.toString())} OFFSET ${parseInt(offset.toString())}
+      `;
+      
+      const [entries] = await db.execute<InventoryEntry[]>(query, [userId]);
+      
+      // Get total count for pagination
+      const [totalResult] = await db.execute<RowDataPacket[]>(
+        'SELECT COUNT(*) as total FROM InventoryEntries WHERE user_id = ?', 
+        [userId]
+      );
+      
+      const total = totalResult[0]?.total || 0;
+      
+      return {
+        username,
+        entries,
+        total
+      };
+    } catch (error) {
+      console.error(`Error getting inventory entries for user ${userId}:`, error);
+      
+      if (error === ERRORS.USER_NOT_FOUND) {
+        throw error;
+      }
+      
+      throw ERRORS.DATABASE_ERROR;
     }
   }
 }

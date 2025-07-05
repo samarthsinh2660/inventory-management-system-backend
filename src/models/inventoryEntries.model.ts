@@ -59,7 +59,9 @@ export interface InventoryEntryUpdateParams {
 export interface ProductBalance {
   product_id: number;
   product_name: string;
+  price_per_unit: number;
   total_quantity: number;
+  total_price: number;
   location_id?: number;
   location_name?: string;
 }

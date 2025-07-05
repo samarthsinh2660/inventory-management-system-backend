@@ -485,3 +485,56 @@ export const getBalance = async (req: Request, res: Response): Promise<void> => 
     });
   }
 };
+
+/**
+ * Get inventory entries for the authenticated user with username
+ */
+export const getUserInventoryEntries = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Ensure user is authenticated
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        error: {
+          code: ERRORS.UNAUTHORIZED.code,
+          message: ERRORS.UNAUTHORIZED.message
+        }
+      });
+      return;
+    }
+    
+    const userId = req.user.id;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    
+    // Get user inventory entries with username
+    const { username, entries, total } = await inventoryEntryRepository.getUserInventoryEntries(
+      userId, 
+      page, 
+      limit
+    );
+    
+    res.json(responseWithMeta(
+      { 
+        username,
+        entries 
+      },
+      {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }, 
+      'User inventory entries retrieved successfully'
+    ));
+  } catch (error) {
+    const requestError = handleUnknownError(error);
+    res.status(requestError.statusCode).json({
+      success: false,
+      error: {
+        code: requestError.code,
+        message: requestError.message
+      }
+    });
+  }
+};
