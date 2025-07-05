@@ -1,6 +1,6 @@
 import express, { Application, Request, Response } from "express";
 import cors from "cors";
-import { PORT, CORS_ORIGIN, CORS_ORIGIN1, CORS_ORIGIN2, CORS_ORIGIN3, CORS_ORIGIN4, CORS_ORIGIN5 } from "./config/env.ts";
+import { PORT, CORS_ORIGIN, CORS_ORIGIN1, CORS_ORIGIN2, CORS_ORIGIN3, CORS_ORIGIN4, CORS_ORIGIN5, CORS_ORIGIN6 } from "./config/env.ts";
 import cookieParser from "cookie-parser";
 import { connectToDatabase } from "./database/db.ts";
 import { limiter } from "./middleware/ratelimit.middleware.ts";
@@ -24,12 +24,13 @@ app.use(limiter);
 
 // Middleware
 app.use(cors({ origin: [
-  CORS_ORIGIN as string,
+      CORS_ORIGIN as string,
       CORS_ORIGIN1 as string,
       CORS_ORIGIN2 as string,
       CORS_ORIGIN3 as string,
       CORS_ORIGIN4 as string,
       CORS_ORIGIN5 as string,
+      CORS_ORIGIN6 as string,
 ],
    credentials: true }));
 app.use(express.json());

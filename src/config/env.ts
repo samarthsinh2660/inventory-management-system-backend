@@ -36,3 +36,4 @@ export const CORS_ORIGIN2 = process.env.CORS_ORIGIN2;
 export const CORS_ORIGIN3 = process.env.CORS_ORIGIN3;
 export const CORS_ORIGIN4 = process.env.CORS_ORIGIN4;
 export const CORS_ORIGIN5 = process.env.CORS_ORIGIN5;
+export const CORS_ORIGIN6 = process.env.CORS_ORIGIN6;
