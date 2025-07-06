@@ -288,7 +288,13 @@ export class ProductRepository {
       
       // Check each formula's components JSON to see if this product is used as a component
       for (const formula of formulas) {
-        const components = JSON.parse(formula.components || '[]');
+        // Handle cases where components might already be parsed as an object
+        let components;
+        if (typeof formula.components === 'string') {
+          components = JSON.parse(formula.components || '[]');
+        } else {
+          components = formula.components || [];
+        }
         
         const isComponentInFormula = components.some(
           (component: any) => component.component_id === id

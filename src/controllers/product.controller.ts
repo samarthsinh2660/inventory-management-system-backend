@@ -121,8 +121,8 @@ export const createProduct = async (req: Request, res: Response, next: NextFunct
       throw ERRORS.PRODUCT_NAME_EXISTS;
     }
 
-    // If a formula ID is provided, verify that the formula exists
-    if (product_formula_id) {
+    // If a formula ID is provided (and not 0), verify that the formula exists
+    if (product_formula_id && product_formula_id !== 0) {
       const formula = await productFormulaRepository.findById(Number(product_formula_id));
       if (!formula) {
         throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
@@ -144,7 +144,7 @@ export const createProduct = async (req: Request, res: Response, next: NextFunct
         location_id,
         subcategory_id,
         price,
-        product_formula_id: product_formula_id ? Number(product_formula_id) : null
+        product_formula_id: (product_formula_id && product_formula_id !== 0) ? Number(product_formula_id) : null
       });
       
       res.status(201).json(createdResponse(product, 'Product created successfully'));
@@ -229,8 +229,8 @@ export const updateProduct = async (req: Request, res: Response, next: NextFunct
 
     // Handle product_formula_id update
     if (product_formula_id !== undefined) {
-      // If setting to null, that's allowed
-      if (product_formula_id === null) {
+      // If setting to null or 0, that's allowed (means no formula)
+      if (product_formula_id === null || product_formula_id === 0) {
         updateData.product_formula_id = null;
       } else {
         // Verify the formula exists

@@ -16,13 +16,15 @@ CREATE TABLE Users (
 CREATE TABLE Locations (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
+    address VARCHAR(255) DEFAULT NULL,
     factory_id INT DEFAULT NULL  -- optional: for multi-factory setup
 );
 
 -- Subcategories Table
 CREATE TABLE Subcategories (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL
+    name VARCHAR(100) NOT NULL,
+    description TEXT DEFAULT NULL
 );
 
 -- ProductFormula Table (now with JSON components)
