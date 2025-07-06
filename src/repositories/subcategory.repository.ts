@@ -43,10 +43,12 @@ export class SubcategoryRepository {
    * Create a new subcategory
    */
   async create(subcategory: SubcategoryCreateParams): Promise<Subcategory> {
+    const { name, description } = subcategory;
+    
     // Check for duplicate subcategory name
     const [existingSubcategories] = await db.execute(
       'SELECT id FROM Subcategories WHERE name = ?',
-      [subcategory.name]
+      [name]
     ) as [any[], any];
 
     if (existingSubcategories.length > 0) {
@@ -54,8 +56,8 @@ export class SubcategoryRepository {
     }
 
     const [result] = await db.execute(
-      'INSERT INTO Subcategories (name) VALUES (?)',
-      [subcategory.name]
+      'INSERT INTO Subcategories (name, description) VALUES (?, ?)',
+      [name, description || null]
     ) as [ResultSetHeader, any];
 
     const newSubcategory = await this.findById(result.insertId);
@@ -70,6 +72,8 @@ export class SubcategoryRepository {
    * Update subcategory
    */
   async update(id: number, subcategoryData: SubcategoryUpdateParams): Promise<Subcategory> {
+    const { name, description } = subcategoryData;
+    
     // Check if the subcategory exists
     const subcategory = await this.findById(id);
     if (!subcategory) {
@@ -77,10 +81,10 @@ export class SubcategoryRepository {
     }
 
     // Check for duplicate subcategory name
-    if (subcategoryData.name !== subcategory.name) {
+    if (name && name !== subcategory.name) {
       const [existingSubcategories] = await db.execute(
         'SELECT id FROM Subcategories WHERE name = ? AND id != ?',
-        [subcategoryData.name, id]
+        [name, id]
       ) as [any[], any];
 
       if (existingSubcategories.length > 0) {
@@ -88,10 +92,26 @@ export class SubcategoryRepository {
       }
     }
 
-    await db.execute(
-      'UPDATE Subcategories SET name = ? WHERE id = ?',
-      [subcategoryData.name, id]
-    );
+    // Build dynamic update query
+    let query = 'UPDATE Subcategories SET ';
+    const params: any[] = [];
+
+    if (name !== undefined) {
+      query += 'name = ?, ';
+      params.push(name);
+    }
+
+    if (description !== undefined) {
+      query += 'description = ?, ';
+      params.push(description);
+    }
+
+    // Remove trailing comma and space
+    query = query.slice(0, -2);
+    query += ' WHERE id = ?';
+    params.push(id);
+
+    await db.execute(query, params);
 
     const updatedSubcategory = await this.findById(id);
     if (!updatedSubcategory) {

@@ -44,7 +44,7 @@ export const getLocationById = async (req: Request, res: Response, next: NextFun
  */
 export const createLocation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { name, factory_id } = req.body;
+    const { name, address, factory_id } = req.body;
     
     // Basic validation
     if (!name) {
@@ -60,7 +60,8 @@ export const createLocation = async (req: Request, res: Response, next: NextFunc
     try {
       const locationData: LocationCreateParams = {
         name,
-        factory_id: factory_id || null
+        address,
+        factory_id: factory_id === undefined ? 1 : factory_id
       };
       
       const location = await locationRepository.create(locationData);
@@ -85,10 +86,10 @@ export const updateLocation = async (req: Request, res: Response, next: NextFunc
       throw ERRORS.INVALID_PARAMS;
     }
     
-    const { name, factory_id } = req.body;
+    const { name, address, factory_id } = req.body;
     
     // At least one field should be provided for update
-    if (!name && factory_id === undefined) {
+    if (!name && address === undefined && factory_id === undefined) {
       throw ERRORS.VALIDATION_ERROR;
     }
     
@@ -108,7 +109,8 @@ export const updateLocation = async (req: Request, res: Response, next: NextFunc
     
     try {
       const locationData: LocationUpdateParams = {};
-      if (name) locationData.name = name;
+      if (name !== undefined) locationData.name = name;
+      if (address !== undefined) locationData.address = address;
       if (factory_id !== undefined) locationData.factory_id = factory_id;
       
       const updatedLocation = await locationRepository.update(locationId, locationData);

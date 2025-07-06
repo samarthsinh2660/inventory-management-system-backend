@@ -4,13 +4,15 @@ export const LOCATIONS_TABLE = `
 CREATE TABLE Locations (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    factory_id INT DEFAULT NULL
+    address VARCHAR(255) DEFAULT NULL,
+    factory_id INT DEFAULT 1
 )
 `;
 
 export interface Location extends RowDataPacket {
   id: number;
   name: string;
+  address?: string | null;
   factory_id: number | null;
 }
 
@@ -19,6 +21,7 @@ export interface Location extends RowDataPacket {
  */
 export interface LocationCreateParams {
   name: string;
+  address?: string | null;
   factory_id?: number | null;
 }
 
@@ -27,5 +30,6 @@ export interface LocationCreateParams {
  */
 export interface LocationUpdateParams {
   name?: string;
+  address?: string | null;
   factory_id?: number | null;
 }

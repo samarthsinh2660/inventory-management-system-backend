@@ -43,7 +43,7 @@ export class LocationRepository {
    * Create a new location
    */
   async create(location: LocationCreateParams): Promise<Location> {
-    const { name, factory_id } = location;
+    const { name, address, factory_id } = location;
 
     // Check for duplicate location name
     const [existingLocations] = await db.execute(
@@ -56,8 +56,8 @@ export class LocationRepository {
     }
 
     const [result] = await db.execute(
-      'INSERT INTO Locations (name, factory_id) VALUES (?, ?)',
-      [name, factory_id || null]
+      'INSERT INTO Locations (name, address, factory_id) VALUES (?, ?, ?)',
+      [name, address || null, factory_id === undefined ? 1 : factory_id]
     ) as [ResultSetHeader, any];
 
     return this.findById(result.insertId) as Promise<Location>;
@@ -67,7 +67,7 @@ export class LocationRepository {
    * Update location
    */
   async update(id: number, locationData: LocationUpdateParams): Promise<Location> {
-    const { name, factory_id } = locationData;
+    const { name, address, factory_id } = locationData;
 
     // Check if the location exists
     const location = await this.findById(id);
@@ -94,6 +94,11 @@ export class LocationRepository {
     if (name !== undefined) {
       query += 'name = ?, ';
       params.push(name);
+    }
+
+    if (address !== undefined) {
+      query += 'address = ?, ';
+      params.push(address);
     }
 
     if (factory_id !== undefined) {

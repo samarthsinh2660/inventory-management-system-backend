@@ -44,7 +44,7 @@ export const getSubcategoryById = async (req: Request, res: Response, next: Next
  */
 export const createSubcategory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { name } = req.body;
+    const { name, description } = req.body;
     
     // Basic validation
     if (!name) {
@@ -58,7 +58,10 @@ export const createSubcategory = async (req: Request, res: Response, next: NextF
     }
     
     try {
-      const subcategoryData: SubcategoryCreateParams = { name };
+      const subcategoryData: SubcategoryCreateParams = { 
+        name,
+        description 
+      };
       const subcategory = await subcategoryRepository.create(subcategoryData);
       
       res.status(201).json(createdResponse(subcategory, 'Subcategory created successfully'));
@@ -81,11 +84,11 @@ export const updateSubcategory = async (req: Request, res: Response, next: NextF
       throw ERRORS.INVALID_PARAMS;
     }
     
-    const { name } = req.body;
+    const { name, description } = req.body;
     
-    // Validation
-    if (!name) {
-      throw ERRORS.SUBCATEGORY_NAME_REQUIRED;
+    // At least one field should be provided for update
+    if (!name && description === undefined) {
+      throw ERRORS.VALIDATION_ERROR;
     }
     
     // Check if subcategory exists
@@ -95,7 +98,7 @@ export const updateSubcategory = async (req: Request, res: Response, next: NextF
     }
     
     // Check for duplicate name if name is being changed
-    if (name !== existingSubcategory.name) {
+    if (name && name !== existingSubcategory.name) {
       const duplicateSubcategory = await subcategoryRepository.findByName(name);
       if (duplicateSubcategory) {
         throw ERRORS.DUPLICATE_SUBCATEGORY_NAME;
@@ -103,7 +106,10 @@ export const updateSubcategory = async (req: Request, res: Response, next: NextF
     }
     
     try {
-      const subcategoryData: SubcategoryUpdateParams = { name };
+      const subcategoryData: SubcategoryUpdateParams = {};
+      if (name !== undefined) subcategoryData.name = name;
+      if (description !== undefined) subcategoryData.description = description;
+      
       const updatedSubcategory = await subcategoryRepository.update(subcategoryId, subcategoryData);
       
       res.json(updatedResponse(updatedSubcategory, 'Subcategory updated successfully'));
