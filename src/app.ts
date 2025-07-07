@@ -1,5 +1,6 @@
 import express, { Application, Request, Response } from "express";
 import cors from "cors";
+import { setupCrashHandlers } from "./utils/crashHandler.ts";
 import { PORT, CORS_ORIGIN, CORS_ORIGIN1, CORS_ORIGIN2, CORS_ORIGIN3, CORS_ORIGIN4, CORS_ORIGIN5, CORS_ORIGIN6 } from "./config/env.ts";
 import cookieParser from "cookie-parser";
 import { connectToDatabase } from "./database/db.ts";
@@ -17,6 +18,9 @@ import { errorHandler, notFoundHandler } from "./middleware/error.middleware.ts"
 import NotificationRouter from "./routes/notification.route.ts";
 
 async function start(){
+// Setup crash handlers first
+setupCrashHandlers();
+
 const app: Application = express()
 
 //ratelimit

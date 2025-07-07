@@ -142,6 +142,10 @@ lib/
 *.sqlite3
 *.db
 
+# Log files
+logs/
+*.log
+
 # OS specific files
 .DS_Store
 Thumbs.db

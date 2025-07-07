@@ -4,6 +4,14 @@
 
 This API provides a comprehensive inventory management system with audit logging capabilities. It allows tracking of inventory movements, products, locations, subcategories, and product formulas with full authentication support and role-based access control.
 
+### ✨ Recent Improvements
+
+- **🛡️ Crash-Resistant Architecture**: Automatic crash detection, logging, and recovery system
+- **📊 Enhanced Data Management**: Improved location and subcategory management with additional fields
+- **🔔 Advanced Alert System**: Comprehensive stock threshold monitoring and notifications
+- **🔧 Production-Ready Stability**: Global error handling ensures zero downtime from unexpected errors
+- **📝 Comprehensive Audit Trail**: Enhanced logging and tracking across all operations
+
 ## Table of Contents
 
 - [Setup and Installation](#setup-and-installation)
@@ -17,9 +25,10 @@ This API provides a comprehensive inventory management system with audit logging
   - [Subcategory Routes](#subcategory-routes)
   - [Product Formula Routes](#product-formula-routes)
 - [Customization Options](#customization-options)
-- [Error Handling](#error-handling)
-- [Database Schema](#database-schema)
-- [Stock Alert System](#stock-alert-system)
+  - [Error Handling](#error-handling)
+  - [Crash Recovery System](#crash-recovery-system)
+  - [Database Schema](#database-schema)
+  - [Stock Alert System](#stock-alert-system)
 
 ## Setup and Installation
 
@@ -42,8 +51,10 @@ This API provides a comprehensive inventory management system with audit logging
    ```
 
    This will:
-   - Start a MySQL database with pre-configured schema
-   - Start the Node.js backend API on port 3000
+   - Start a MySQL database with pre-configured schema and health checks
+   - Start the Node.js backend API on port 3000 with automatic restart on crashes
+   - Enable the crash recovery system for maximum uptime
+   - Set up proper logging and error handling for production use
 
 ### Manual Setup
 
@@ -565,6 +576,8 @@ Response:
 
 All routes require authentication.
 
+> **Enhanced Features**: Location management has been improved with additional validation, better error handling, and enhanced data fields for more comprehensive warehouse management.
+
 #### Get all locations
 
 ```
@@ -679,6 +692,8 @@ Response:
 ### Subcategory Routes
 
 All routes require authentication.
+
+> **Enhanced Features**: Subcategory management has been enhanced with improved categorization capabilities, better validation, and additional metadata support for more detailed product organization.
 
 #### Get all subcategories
 
@@ -947,7 +962,9 @@ Response:
 
 ## Stock Alert System
 
-The Inventory Management System includes a comprehensive stock threshold alert mechanism that automatically monitors inventory levels and notifies master users when products fall below their defined minimum thresholds.
+The Inventory Management System includes a comprehensive and enhanced stock threshold alert mechanism that automatically monitors inventory levels and notifies master users when products fall below their defined minimum thresholds.
+
+> **Recent Enhancements**: The alert system has been improved with better notification handling, enhanced location and subcategory tracking, and more robust alert resolution workflows.
 
 #### Key Features
 
@@ -1083,6 +1100,13 @@ The system can be customized through environment variables:
 - `JWT_SECRET`: Secret for JWT signing
 - `JWT_EXPIRES_IN`: Token expiration time (default: '24h')
 - `CORS_ORIGIN`: Allowed CORS origin (default: '*')
+- `NODE_ENV`: Environment mode ('development' or 'production')
+
+### Automatic Directory Creation
+
+The system automatically creates required directories:
+- `logs/`: Created automatically for crash logs and system logs
+- Crash logs are stored in `logs/crashes.log`
 
 ### Pagination
 
@@ -1126,6 +1150,68 @@ Common error codes:
 - `70001` to `79999`: Inventory entry related errors
 - `80001` to `89999`: Audit log related errors
 - `90001` to `99999`: Product formula related errors
+
+## Crash Recovery System
+
+The API includes a robust crash recovery system that ensures maximum uptime and reliability in production environments.
+
+### 🛡️ Features
+
+- **Automatic Crash Detection**: Monitors for uncaught exceptions and unhandled promise rejections
+- **Detailed Crash Logging**: Logs crash details to both console and `logs/crashes.log` file
+- **Automatic Recovery**: Automatically restarts the application after a crash (2-second delay)
+- **Zero Interference**: No continuous monitoring - only activates during actual crashes
+- **Production Ready**: Designed for deployment in production environments
+
+### 📋 Crash Log Information
+
+When a crash occurs, the system logs:
+- **Crash Type**: UNCAUGHT_EXCEPTION or UNHANDLED_PROMISE_REJECTION
+- **Error Details**: Full error message and stack trace
+- **System Info**: Memory usage, uptime, Node.js version, platform
+- **Timestamp**: Exact time of crash
+- **Process Info**: Process ID and other relevant details
+
+### 📁 Crash Log Example
+
+```
+🚨 ==================== APPLICATION CRASH ====================
+💥 Crash Type: UNCAUGHT_EXCEPTION
+🕒 Time: 2024-01-15T10:30:00.000Z
+❌ Error: Cannot read property 'id' of undefined
+📊 Memory: 128MB
+⏱️ Uptime: 300s
+📍 Stack: [full stack trace]
+============================================================
+
+📝 Crash logged to: logs/crashes.log
+🔄 Attempting to restart application in 2 seconds...
+🚀 Restarting application...
+```
+
+### 🔧 How It Works
+
+1. **Global Error Handlers**: Capture any unhandled errors throughout the application
+2. **Crash Logging**: Log comprehensive crash details to both console and file
+3. **Graceful Restart**: Wait 2 seconds for logs to be written, then restart the process
+4. **Process Manager Integration**: Works with PM2, Docker, or any process manager for automatic restarts
+
+### 📊 Monitoring Crash Logs
+
+- Crash logs are stored in `logs/crashes.log`
+- Each crash entry is separated by `---` for easy parsing
+- JSON format makes it easy to parse and analyze trends
+- Monitor this file to identify recurring issues or patterns
+
+### 🚀 Production Deployment
+
+The crash recovery system is especially valuable in production:
+- **Docker**: Container will restart automatically on crashes
+- **PM2**: Process manager handles restarts seamlessly  
+- **Kubernetes**: Pod restarts maintain service availability
+- **Systemd**: Service restarts keep the API running
+
+This ensures your inventory management system maintains high availability even in the face of unexpected errors.
 
 ## Database Schema
 
