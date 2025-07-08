@@ -27,15 +27,7 @@ const app: Application = express()
 app.use(limiter);
 
 // Middleware
-app.use(cors({ origin: [
-      CORS_ORIGIN as string,
-      CORS_ORIGIN1 as string,
-      CORS_ORIGIN2 as string,
-      CORS_ORIGIN3 as string,
-      CORS_ORIGIN4 as string,
-      CORS_ORIGIN5 as string,
-      CORS_ORIGIN6 as string,
-],
+app.use(cors({ origin: '*',
    credentials: true }));
 app.use(express.json());
 
