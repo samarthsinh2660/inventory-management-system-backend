@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS AuditLogs (
     user_id INT NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     reason TEXT,
+    is_flag BOOLEAN DEFAULT false,
     FOREIGN KEY (entry_id) REFERENCES InventoryEntries(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE RESTRICT
 )
@@ -24,6 +25,7 @@ export interface AuditLog extends RowDataPacket {
   user_id: number;
   timestamp: Date;
   reason?: string;
+  is_flag: boolean;
   
   // These fields may be joined from other tables
   username?: string;
@@ -46,4 +48,9 @@ export interface AuditLogFilter {
   end_date?: Date;
   page?: number;
   limit?: number;
+  is_flag?: boolean;
+}
+
+export interface AuditLogFlagUpdate {
+  is_flag: boolean;
 }

@@ -55,6 +55,11 @@ export class AuditLogRepository {
         params.push(new Date(end_date));
       }
       
+      if (typeof filter.is_flag === 'boolean') {
+        whereClauses.push('al.is_flag = ?');
+        params.push(filter.is_flag);
+      }
+      
       // Construct the WHERE part of the query
       const whereClause = whereClauses.length > 0 
         ? `WHERE ${whereClauses.join(' AND ')}` 
@@ -297,6 +302,37 @@ export class AuditLogRepository {
     } catch (error) {
       console.error(`Error logging delete for entry ${entryId}:`, error);
       throw ERRORS.AUDIT_LOG_CREATION_FAILED;
+    }
+  }
+
+  /**
+   * Updates the flag status of an audit log
+   */
+  async updateFlag(id: number, isFlag: boolean): Promise<AuditLog> {
+    try {
+      // First update the flag
+      const [result] = await db.execute<ResultSetHeader>(
+        'UPDATE AuditLogs SET is_flag = ? WHERE id = ?',
+        [isFlag, id]
+      );
+
+      if (result.affectedRows === 0) {
+        throw ERRORS.AUDIT_LOG_NOT_FOUND;
+      }
+
+      // Then fetch and return the updated audit log
+      const updatedLog = await this.findById(id);
+      if (!updatedLog) {
+        throw ERRORS.AUDIT_LOG_NOT_FOUND;
+      }
+
+      return updatedLog;
+    } catch (error) {
+      console.error(`Error updating flag for audit log ${id}:`, error);
+      if (error === ERRORS.AUDIT_LOG_NOT_FOUND) {
+        throw error;
+      }
+      throw ERRORS.DATABASE_ERROR;
     }
   }
 }

@@ -84,6 +84,7 @@ CREATE TABLE AuditLogs (
     user_id INT NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     reason TEXT,
+    is_flag BOOLEAN DEFAULT false,
     FOREIGN KEY (entry_id) REFERENCES InventoryEntries(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE RESTRICT
 );

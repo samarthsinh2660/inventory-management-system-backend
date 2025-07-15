@@ -36,6 +36,10 @@ export const getAllLogs = async (req: Request, res: Response): Promise<void> => 
       filter.end_date = new Date(req.query.end_date as string);
     }
     
+    if (req.query.is_flag !== undefined) {
+      filter.is_flag = req.query.is_flag === 'true';
+    }
+    
     // Pagination
     filter.page = parseInt(req.query.page as string) || 1;
     filter.limit = parseInt(req.query.limit as string) || 10;
@@ -212,6 +216,57 @@ export const deleteLog = async (req: Request, res: Response): Promise<void> => {
     res.json(deletedResponse(message));
   } catch (error) {
     console.error("Error in deleteLog:", error);
+    const requestError = handleUnknownError(error);
+    res.status(requestError.statusCode).json({
+      success: false,
+      error: {
+        code: requestError.code,
+        message: requestError.message
+      }
+    });
+  }
+};
+
+/**
+ * Update the flag status of an audit log
+ * Only masters can update flags for resolution with employees
+ */
+export const updateFlag = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const logId = parseInt(req.params.id);
+    
+    if (isNaN(logId)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 400,
+          message: "Invalid audit log ID"
+        }
+      });
+      return;
+    }
+    
+    const { is_flag } = req.body;
+    
+    if (typeof is_flag !== 'boolean') {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 400,
+          message: "is_flag must be a boolean value"
+        }
+      });
+      return;
+    }
+    
+    const updatedLog = await auditLogRepository.updateFlag(logId, is_flag);
+    
+    res.json(successResponse(
+      updatedLog,
+      `Audit log flag ${is_flag ? 'set' : 'unset'} successfully`
+    ));
+  } catch (error) {
+    console.error("Error in updateFlag:", error);
     const requestError = handleUnknownError(error);
     res.status(requestError.statusCode).json({
       success: false,

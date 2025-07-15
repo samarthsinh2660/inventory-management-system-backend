@@ -3,7 +3,8 @@ import {
   getAllLogs,
   getLogById,
   deleteLog,
-  getLogsByEntryId
+  getLogsByEntryId,
+  updateFlag
 } from '../controllers/auditLog.controller.ts';
 import { authenticate, requireMaster } from '../middleware/auth.middleware.ts';
 
@@ -28,5 +29,9 @@ AuditLogRouter.get('/record-type/:recordType', getLogsByEntryId);
 // Delete an audit log and revert the changes if possible
 // Only master can delete and revert audit logs
 AuditLogRouter.delete('/:id', requireMaster, deleteLog);
+
+// Update the flag status of an audit log
+// Only master can update flags for resolution with employees
+AuditLogRouter.patch('/:id/flag', requireMaster, updateFlag);
 
 export default AuditLogRouter;
