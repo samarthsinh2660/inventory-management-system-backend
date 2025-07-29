@@ -13,7 +13,7 @@ const subcategoryRouter = Router();
 // Apply authentication to all subcategory routes
 subcategoryRouter.use(authenticate);
 
-// Get all subcategories
+// Get all subcategories (with optional category query param)
 subcategoryRouter.get('/', getAllSubcategories);
 
 // Get subcategory by ID

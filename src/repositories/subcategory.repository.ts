@@ -40,10 +40,22 @@ export class SubcategoryRepository {
   }
 
   /**
+   * Get subcategories by category
+   */
+  async getSubcategoriesByCategory(category: string): Promise<Subcategory[]> {
+    const [subcategories] = await db.execute(
+      'SELECT * FROM Subcategories WHERE category = ? ORDER BY name',
+      [category]
+    ) as [Subcategory[], any];
+
+    return subcategories;
+  }
+
+  /**
    * Create a new subcategory
    */
   async create(subcategory: SubcategoryCreateParams): Promise<Subcategory> {
-    const { name, description } = subcategory;
+    const { category, name, description } = subcategory;
     
     // Check for duplicate subcategory name
     const [existingSubcategories] = await db.execute(
@@ -56,8 +68,8 @@ export class SubcategoryRepository {
     }
 
     const [result] = await db.execute(
-      'INSERT INTO Subcategories (name, description) VALUES (?, ?)',
-      [name, description || null]
+      'INSERT INTO Subcategories (category, name, description) VALUES (?, ?, ?)',
+      [category, name, description || null]
     ) as [ResultSetHeader, any];
 
     const newSubcategory = await this.findById(result.insertId);
@@ -72,7 +84,7 @@ export class SubcategoryRepository {
    * Update subcategory
    */
   async update(id: number, subcategoryData: SubcategoryUpdateParams): Promise<Subcategory> {
-    const { name, description } = subcategoryData;
+    const { category, name, description } = subcategoryData;
     
     // Check if the subcategory exists
     const subcategory = await this.findById(id);
@@ -95,6 +107,11 @@ export class SubcategoryRepository {
     // Build dynamic update query
     let query = 'UPDATE Subcategories SET ';
     const params: any[] = [];
+
+    if (category !== undefined) {
+      query += 'category = ?, ';
+      params.push(category);
+    }
 
     if (name !== undefined) {
       query += 'name = ?, ';

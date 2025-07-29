@@ -14,6 +14,7 @@ import ProductFormulaRouter from "./routes/productFormula.route.ts";
 import InventoryEntryRouter from "./routes/inventoryEntry.route.ts";
 import AuditLogRouter from "./routes/auditLog.route.ts";
 import AlertRouter from "./routes/alert.route.ts"; // Add this line
+import PurchaseInfoRouter from "./routes/purchaseInfo.route.ts";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware.ts";
 import NotificationRouter from "./routes/notification.route.ts";
 
@@ -57,6 +58,7 @@ app.use('/api/products', ProductRouter);
 app.use('/api/locations', LocationRouter);
 app.use('/api/subcategories', SubcategoryRouter);
 app.use('/api/product-formulas', ProductFormulaRouter);
+app.use('/api/purchase-info', PurchaseInfoRouter);
 app.use('/api/inventory', InventoryEntryRouter);
 app.use('/api/audit-logs', AuditLogRouter);
 app.use('/api/alerts', AlertRouter); // Add this line

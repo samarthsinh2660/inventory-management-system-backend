@@ -75,7 +75,8 @@ export const createProduct = async (req: Request, res: Response, next: NextFunct
       location_id, 
       subcategory_id, 
       price,
-      product_formula_id 
+      product_formula_id,
+      purchase_info_id 
     } = req.body;
     
     // Basic validation
@@ -144,7 +145,8 @@ export const createProduct = async (req: Request, res: Response, next: NextFunct
         location_id,
         subcategory_id,
         price,
-        product_formula_id: (product_formula_id && product_formula_id !== 0) ? Number(product_formula_id) : null
+        product_formula_id: (product_formula_id && product_formula_id !== 0) ? Number(product_formula_id) : null,
+        purchase_info_id: purchase_info_id ? Number(purchase_info_id) : null
       });
       
       res.status(201).json(createdResponse(product, 'Product created successfully'));
@@ -176,7 +178,8 @@ export const updateProduct = async (req: Request, res: Response, next: NextFunct
       location_id, 
       subcategory_id, 
       price,
-      product_formula_id 
+      product_formula_id,
+      purchase_info_id 
     } = req.body;
     
     // Check if product exists
@@ -249,6 +252,11 @@ export const updateProduct = async (req: Request, res: Response, next: NextFunct
       }
     }
     
+    // Handle purchase_info_id update
+    if (purchase_info_id !== undefined) {
+      updateData.purchase_info_id = purchase_info_id ? Number(purchase_info_id) : null;
+    }
+    
     try {
       const updatedProduct = await productRepository.update(productId, updateData);
       
@@ -312,6 +320,7 @@ export const searchProducts = async (req: Request, res: Response, next: NextFunc
       component_id,
       is_parent,
       is_component,
+      purchase_info_id,
       page,
       limit
     } = req.query;
@@ -379,6 +388,19 @@ export const searchProducts = async (req: Request, res: Response, next: NextFunc
     
     if (is_component !== undefined) {
       parsedFilters.is_component = is_component === 'true';
+    }
+    
+    // Parse purchase_info_id parameter
+    if (purchase_info_id !== undefined) {
+      if (purchase_info_id === 'null' || purchase_info_id === '') {
+        parsedFilters.purchase_info_id = null;
+      } else {
+        const parsedPurchaseInfoId = parseInt(purchase_info_id as string, 10);
+        if (isNaN(parsedPurchaseInfoId)) {
+          throw ERRORS.INVALID_PARAMS;
+        }
+        parsedFilters.purchase_info_id = parsedPurchaseInfoId;
+      }
     }
     
     // Handle pagination

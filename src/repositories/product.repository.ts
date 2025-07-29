@@ -9,11 +9,14 @@ export class ProductRepository {
    */
   async findById(id: number): Promise<Product | null> {
     const [products] = await db.execute(
-      `SELECT p.*, s.name as subcategory_name, l.name as location_name, pf.name as product_formula_name
+      `SELECT p.*, s.name as subcategory_name, l.name as location_name, pf.name as product_formula_name,
+              pi.business_name as purchase_business_name, pi.address as purchase_address,
+              pi.phone_number as purchase_phone, pi.email as purchase_email, pi.gst_number as purchase_gst
        FROM Products p
        JOIN Subcategories s ON p.subcategory_id = s.id
        JOIN Locations l ON p.location_id = l.id
        LEFT JOIN ProductFormula pf ON p.product_formula_id = pf.id
+       LEFT JOIN PurchaseInfo pi ON p.purchase_info_id = pi.id
        WHERE p.id = ?`,
       [id]
     ) as [Product[], any];
@@ -83,6 +86,7 @@ export class ProductRepository {
     location_id?: number | null;
     price?: number | null;
     product_formula_id?: number | null;
+    purchase_info_id?: number | null;
   }): Promise<Product> {
     try {
       // Check if product name already exists
@@ -98,8 +102,8 @@ export class ProductRepository {
       // Insert the product
       const [result] = await db.execute(
         `INSERT INTO Products 
-         (subcategory_id, name, unit, source_type, category, min_stock_threshold, location_id, price, product_formula_id) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (subcategory_id, name, unit, source_type, category, min_stock_threshold, location_id, price, product_formula_id, purchase_info_id) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           productData.subcategory_id,
           productData.name,
@@ -109,7 +113,8 @@ export class ProductRepository {
           productData.min_stock_threshold || null,
           productData.location_id || null,
           productData.price || null,
-          productData.product_formula_id || null
+          productData.product_formula_id || null,
+          productData.purchase_info_id || null
         ]
       ) as [ResultSetHeader, any];
 
@@ -152,6 +157,7 @@ export class ProductRepository {
       location_id?: number | null;
       price?: number | null;
       product_formula_id?: number | null;
+      purchase_info_id?: number | null;
     }
   ): Promise<Product | null> {
     try {
@@ -220,6 +226,11 @@ export class ProductRepository {
       if (productData.product_formula_id !== undefined) {
         updateFields.push("product_formula_id = ?");
         updateValues.push(productData.product_formula_id);
+      }
+
+      if (productData.purchase_info_id !== undefined) {
+        updateFields.push("purchase_info_id = ?");
+        updateValues.push(productData.purchase_info_id);
       }
 
       // Return early if no fields to update
@@ -346,6 +357,7 @@ export class ProductRepository {
       component_id,
       is_parent,
       is_component,
+      purchase_info_id,
       page = 1,
       limit = 10
     } = filters;
@@ -354,10 +366,12 @@ export class ProductRepository {
     let baseQuery = `
       SELECT SQL_CALC_FOUND_ROWS p.*, 
       s.name as subcategory_name, 
-      l.name as location_name
+      l.name as location_name,
+      pf.name as product_formula_name
       FROM Products p
       JOIN Subcategories s ON p.subcategory_id = s.id
       JOIN Locations l ON p.location_id = l.id
+      LEFT JOIN ProductFormula pf ON p.product_formula_id = pf.id
     `;
 
     // Initialize where clauses and parameters
@@ -389,6 +403,15 @@ export class ProductRepository {
     if (source_type) {
       whereClauses.push('p.source_type = ?');
       params.push(source_type);
+    }
+
+    if (purchase_info_id !== undefined) {
+      if (purchase_info_id === null) {
+        whereClauses.push('p.purchase_info_id IS NULL');
+      } else {
+        whereClauses.push('p.purchase_info_id = ?');
+        params.push(purchase_info_id);
+      }
     }
 
     // Formula-related filters - Use direct strings for EXISTS/NOT EXISTS clauses

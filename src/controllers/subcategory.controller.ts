@@ -5,12 +5,29 @@ import { successResponse, listResponse, createdResponse, updatedResponse, delete
 import { SubcategoryCreateParams, SubcategoryUpdateParams } from '../models/subCategories.model.ts';
 
 /**
- * Get all subcategories
+ * Get all subcategories (with optional category filter)
  */
 export const getAllSubcategories = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const subcategories = await subcategoryRepository.getAllSubcategories();
-    res.json(listResponse(subcategories, 'Subcategories retrieved successfully'));
+    const { category } = req.query;
+    
+    let subcategories;
+    
+    if (category) {
+      // Validate category enum if provided
+      if (!['raw', 'semi', 'finished'].includes(category as string)) {
+        throw ERRORS.VALIDATION_ERROR;
+      }
+      subcategories = await subcategoryRepository.getSubcategoriesByCategory(category as string);
+    } else {
+      subcategories = await subcategoryRepository.getAllSubcategories();
+    }
+    
+    const message = category 
+      ? `Subcategories for category '${category}' retrieved successfully`
+      : 'Subcategories retrieved successfully';
+    
+    res.json(listResponse(subcategories, message));
   } catch (error: unknown) {
     next(error);
   }
@@ -44,11 +61,19 @@ export const getSubcategoryById = async (req: Request, res: Response, next: Next
  */
 export const createSubcategory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { name, description } = req.body;
+    const { category, name, description } = req.body;
     
     // Basic validation
+    if (!category) {
+      throw ERRORS.VALIDATION_ERROR;
+    }
     if (!name) {
       throw ERRORS.SUBCATEGORY_NAME_REQUIRED;
+    }
+    
+    // Validate category enum
+    if (!['raw', 'semi', 'finished'].includes(category)) {
+      throw ERRORS.VALIDATION_ERROR;
     }
     
     // Check for duplicate name
@@ -59,6 +84,7 @@ export const createSubcategory = async (req: Request, res: Response, next: NextF
     
     try {
       const subcategoryData: SubcategoryCreateParams = { 
+        category,
         name,
         description 
       };
@@ -84,10 +110,15 @@ export const updateSubcategory = async (req: Request, res: Response, next: NextF
       throw ERRORS.INVALID_PARAMS;
     }
     
-    const { name, description } = req.body;
+    const { category, name, description } = req.body;
     
     // At least one field should be provided for update
-    if (!name && description === undefined) {
+    if (!category && !name && description === undefined) {
+      throw ERRORS.VALIDATION_ERROR;
+    }
+    
+    // Validate category enum if provided
+    if (category && !['raw', 'semi', 'finished'].includes(category)) {
       throw ERRORS.VALIDATION_ERROR;
     }
     
@@ -107,6 +138,7 @@ export const updateSubcategory = async (req: Request, res: Response, next: NextF
     
     try {
       const subcategoryData: SubcategoryUpdateParams = {};
+      if (category !== undefined) subcategoryData.category = category;
       if (name !== undefined) subcategoryData.name = name;
       if (description !== undefined) subcategoryData.description = description;
       

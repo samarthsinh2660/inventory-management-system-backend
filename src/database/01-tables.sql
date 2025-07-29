@@ -23,8 +23,21 @@ CREATE TABLE Locations (
 -- Subcategories Table
 CREATE TABLE Subcategories (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    category ENUM('raw', 'semi', 'finished') NOT NULL,
     name VARCHAR(100) NOT NULL,
     description TEXT DEFAULT NULL
+);
+
+-- PurchaseInfo Table (Supplier/Vendor Information)
+CREATE TABLE PurchaseInfo (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    business_name VARCHAR(200) NOT NULL,
+    address TEXT,
+    phone_number VARCHAR(20),
+    email VARCHAR(100),
+    gst_number VARCHAR(15),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- ProductFormula Table (now with JSON components)
@@ -47,13 +60,15 @@ CREATE TABLE Products (
     category ENUM('raw', 'semi', 'finished') NOT NULL,
     min_stock_threshold FLOAT DEFAULT NULL,
     location_id INT NOT NULL,
-    product_formula_id INT DEFAULT NULL,  -- New: Reference to product formula
+    product_formula_id INT DEFAULT NULL,  -- Reference to product formula
+    purchase_info_id INT DEFAULT NULL,    -- Optional: Reference to purchase info
     price DECIMAL(10, 2) DEFAULT 0.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (subcategory_id) REFERENCES Subcategories(id) ON DELETE RESTRICT,
     FOREIGN KEY (location_id) REFERENCES Locations(id) ON DELETE RESTRICT,
-    FOREIGN KEY (product_formula_id) REFERENCES ProductFormula(id) ON DELETE RESTRICT
+    FOREIGN KEY (product_formula_id) REFERENCES ProductFormula(id) ON DELETE RESTRICT,
+    FOREIGN KEY (purchase_info_id) REFERENCES PurchaseInfo(id) ON DELETE SET NULL
 );
 
 -- InventoryEntries Table (Ledger)

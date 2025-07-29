@@ -11,11 +11,17 @@ VALUES
   ('Assembly Unit', NULL);
 
 -- Subcategories
-INSERT INTO Subcategories (name)
+INSERT INTO Subcategories (category, name)
 VALUES
-  ('Metals'),
-  ('Casing'),
-  ('Electronics');
+  ('raw', 'Metals'),
+  ('semi', 'Casing'),
+  ('finished', 'Electronics');
+
+-- PurchaseInfo (Supplier/Vendor Information)
+INSERT INTO PurchaseInfo (business_name, address, phone_number, email, gst_number)
+VALUES
+  ('ABC Steel Suppliers', '123 Industrial Area, Mumbai, Maharashtra', '+91-9876543210', 'contact@abcsteel.com', '27ABCDE1234F1Z5'),
+  ('XYZ Electronics Ltd', '456 Tech Park, Bangalore, Karnataka', '+91-8765432109', 'sales@xyzelec.com', '29XYZAB5678G2Y4');
 
 -- Product Formulas with JSON components
 INSERT INTO ProductFormula (name, description, components)
@@ -34,11 +40,11 @@ VALUES
 -- Locations: Main = 1, Assembly = 2
 -- ProductFormula: Fan Assembly Formula = 1
 
-INSERT INTO Products (subcategory_id, name, unit, source_type, category, min_stock_threshold, location_id, product_formula_id, price)
+INSERT INTO Products (subcategory_id, name, unit, source_type, category, min_stock_threshold, location_id, product_formula_id, purchase_info_id, price)
 VALUES
-  (1, 'Steel Rod', 'kg', 'trading', 'raw', 100, 1, NULL, 25.50),     -- Raw Trading product
-  (2, 'Motor Shell', 'pcs', 'manufacturing', 'semi', 20, 2, NULL, 75.00), -- Semi-finished
-  (3, 'Fan Assembly', 'pcs', 'manufacturing', 'finished', 10, 2, 1, 150.00); -- Final product with formula
+  (1, 'Steel Rod', 'kg', 'trading', 'raw', 100, 1, NULL, 1, 25.50),     -- Raw Trading product with supplier info
+  (2, 'Motor Shell', 'pcs', 'manufacturing', 'semi', 20, 2, NULL, NULL, 75.00), -- Semi-finished (no supplier)
+  (3, 'Fan Assembly', 'pcs', 'manufacturing', 'finished', 10, 2, 1, NULL, 150.00); -- Final product with formula (no supplier)
 
 -- Inventory Entries (Ledger)
 -- Assume: Bob Employee = id 2

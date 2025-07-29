@@ -42,6 +42,13 @@ export interface Product extends RowDataPacket {
   location_id: number;
   price: number;
   product_formula_id: number | null;
+  purchase_info_id?: number | null;
+  // Purchase info fields (from JOIN)
+  purchase_business_name?: string | null;
+  purchase_address?: string | null;
+  purchase_phone?: string | null;
+  purchase_email?: string | null;
+  purchase_gst?: string | null;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -59,6 +66,7 @@ export interface ProductSearchParams {
   component_id?: number;     // Find products that use specific component ID
   is_parent?: boolean;       // Whether product has any formulas defined
   is_component?: boolean;    // Whether product is used as a component
+  purchase_info_id?: number | null; // Filter by purchase info (supplier) ID
   page?: number;             // Pagination: page number, default 1
   limit?: number;            // Pagination: items per page, default 20
 }
@@ -76,4 +84,5 @@ export interface ProductCreateParams {
   subcategory_id: number;
   price?: number;
   product_formula_id?: number | null;
+  purchase_info_id?: number | null;
 }
