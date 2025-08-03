@@ -289,12 +289,14 @@ SELECT
   COALESCE(SUM(
     CASE 
       WHEN ie.entry_type IN ('manual_in', 'manufacturing_in') THEN ie.quantity
+      WHEN ie.entry_type = 'manufacturing_out' THEN ie.quantity
       ELSE -ie.quantity
     END
   ), 0) AS total_quantity,
   ROUND(p.price * COALESCE(SUM(
     CASE 
       WHEN ie.entry_type IN ('manual_in', 'manufacturing_in') THEN ie.quantity
+      WHEN ie.entry_type = 'manufacturing_out' THEN ie.quantity
       ELSE -ie.quantity
     END
   ), 0), 2) AS total_price,
