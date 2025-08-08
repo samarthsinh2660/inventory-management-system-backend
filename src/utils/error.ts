@@ -154,6 +154,8 @@ export const ERRORS = {
     QUANTITY_REQUIRED: new RequestError("Inventory quantity must be a non-zero number", 70006, 400), // Alias for INVENTORY_ENTRY_INVALID_QUANTITY
     ENTRY_TYPE_REQUIRED: new RequestError("Entry type is required", 70009, 400), // Alias for INVENTORY_ENTRY_TYPE_REQUIRED
     LOCATION_REQUIRED: new RequestError("Location is required for inventory entry", 70008, 400), // Alias for INVENTORY_ENTRY_LOCATION_REQUIRED
+    INVENTORY_FILTER_VALIDATION_ERROR: new RequestError("Invalid filter parameters provided", 70012, 400),
+    INVENTORY_SEARCH_FAILED: new RequestError("Failed to search inventory entries with provided filters", 70013, 500),
     
     // Audit Log Errors (8xxxx)
     AUDIT_LOG_NOT_FOUND: new RequestError("Audit log not found", 80001, 404), 

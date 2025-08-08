@@ -70,3 +70,36 @@ export interface InventoryBalance {
   products: ProductBalance[];
   total_products: number;
 }
+
+// Filter interfaces for inventory entries
+export interface InventoryEntryFilters {
+  // Search filters
+  search?: string; // General search across product name, notes, reference_id
+  
+  // Basic filters
+  entry_type?: 'manual_in' | 'manual_out' | 'manufacturing_in' | 'manufacturing_out';
+  user_id?: number;
+  location_id?: number;
+  reference_id?: string;
+  
+  // Product hierarchy filters
+  product_id?: number;
+  category?: 'raw' | 'semi' | 'finished';
+  subcategory_id?: number;
+  
+  // Timestamp filters
+  date_from?: string; // ISO date string
+  date_to?: string;   // ISO date string
+  days?: number;      // Filter for last N days (1, 3, 7, etc.)
+  
+  // Pagination
+  page?: number;
+  limit?: number;
+}
+
+// Response interface for filtered inventory entries
+export interface FilteredInventoryEntriesResponse {
+  entries: InventoryEntry[];
+  total: number;
+  filters_applied: InventoryEntryFilters;
+}

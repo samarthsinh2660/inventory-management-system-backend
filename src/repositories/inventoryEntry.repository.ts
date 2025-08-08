@@ -6,38 +6,151 @@ import {
   InventoryEntryCreateParams, 
   InventoryEntryUpdateParams,
   ProductBalance,
-  InventoryBalance
+  InventoryBalance,
+  InventoryEntryFilters,
+  FilteredInventoryEntriesResponse
 } from "../models/inventoryEntries.model.ts";
 import { FormulaComponentData } from "../models/productFormula.model.ts";
 
 export class InventoryEntryRepository {
   
   /**
-   * Finds all inventory entries with optional pagination
+   * Finds all inventory entries with optional pagination (legacy method)
    */
-  async findAll(page: number = 1, limit: number = 10): Promise<{ entries: InventoryEntry[], total: number }> {
+  async findAll(page: number = 1, limit: number = 100): Promise<{ entries: InventoryEntry[], total: number }> {
+    // Use the new filtering method with empty filters for backward compatibility
+    const result = await this.findAllWithFilters({ page, limit });
+    return { entries: result.entries, total: result.total };
+  }
+
+  /**
+   * Finds inventory entries with comprehensive filtering support
+   */
+  async findAllWithFilters(filters: InventoryEntryFilters): Promise<FilteredInventoryEntriesResponse> {
     try {
+      const page = filters.page || 1;
+      const limit = Math.min(filters.limit || 100, 100); // Cap at 100
       const offset = (page - 1) * limit;
       
-      // Use direct integer values in the query rather than parameters for LIMIT/OFFSET
-      const query = `
-        SELECT ie.*, p.name as product_name, l.name as location_name, u.username
+      // Build WHERE conditions and parameters
+      const whereConditions: string[] = [];
+      const queryParams: any[] = [];
+      
+      // Search filter - searches across product name, notes, and reference_id
+      if (filters.search) {
+        whereConditions.push(`(
+          p.name LIKE ? OR 
+          ie.notes LIKE ? OR 
+          ie.reference_id LIKE ?
+        )`);
+        const searchTerm = `%${filters.search}%`;
+        queryParams.push(searchTerm, searchTerm, searchTerm);
+      }
+      
+      // Entry type filter
+      if (filters.entry_type) {
+        whereConditions.push('ie.entry_type = ?');
+        queryParams.push(filters.entry_type);
+      }
+      
+      // User filter
+      if (filters.user_id) {
+        whereConditions.push('ie.user_id = ?');
+        queryParams.push(filters.user_id);
+      }
+      
+      // Location filter
+      if (filters.location_id) {
+        whereConditions.push('ie.location_id = ?');
+        queryParams.push(filters.location_id);
+      }
+      
+      // Reference ID filter
+      if (filters.reference_id) {
+        whereConditions.push('ie.reference_id = ?');
+        queryParams.push(filters.reference_id);
+      }
+      
+      // Product ID filter
+      if (filters.product_id) {
+        whereConditions.push('ie.product_id = ?');
+        queryParams.push(filters.product_id);
+      }
+      
+      // Category filter (requires joining with subcategories)
+      if (filters.category) {
+        whereConditions.push('sc.category = ?');
+        queryParams.push(filters.category);
+      }
+      
+      // Subcategory filter
+      if (filters.subcategory_id) {
+        whereConditions.push('p.subcategory_id = ?');
+        queryParams.push(filters.subcategory_id);
+      }
+      
+      // Date range filters
+      if (filters.date_from) {
+        whereConditions.push('ie.timestamp >= ?');
+        queryParams.push(filters.date_from);
+      }
+      
+      if (filters.date_to) {
+        whereConditions.push('ie.timestamp <= ?');
+        queryParams.push(filters.date_to);
+      }
+      
+      // Days filter (last N days)
+      if (filters.days) {
+        whereConditions.push('ie.timestamp >= DATE_SUB(NOW(), INTERVAL ? DAY)');
+        queryParams.push(filters.days);
+      }
+      
+      // Build the main query
+      const baseQuery = `
         FROM InventoryEntries ie
         JOIN Products p ON ie.product_id = p.id
         JOIN Locations l ON ie.location_id = l.id
         JOIN Users u ON ie.user_id = u.id
+        ${filters.category ? 'JOIN Subcategories sc ON p.subcategory_id = sc.id' : ''}
+      `;
+      
+      const whereClause = whereConditions.length > 0 
+        ? `WHERE ${whereConditions.join(' AND ')}` 
+        : '';
+      
+      // Get entries with all the joins and filters
+      const entriesQuery = `
+        SELECT 
+          ie.*,
+          p.name as product_name,
+          l.name as location_name,
+          u.username
+        ${baseQuery}
+        ${whereClause}
         ORDER BY ie.timestamp DESC
         LIMIT ${parseInt(limit.toString())} OFFSET ${parseInt(offset.toString())}
       `;
       
-      const [entries] = await db.execute<InventoryEntry[]>(query, []);
+      const [entries] = await db.execute<InventoryEntry[]>(entriesQuery, queryParams);
       
-      const [countResult] = await db.execute<RowDataPacket[]>('SELECT COUNT(*) as total FROM InventoryEntries');
+      // Get total count with the same filters
+      const countQuery = `
+        SELECT COUNT(*) as total
+        ${baseQuery}
+        ${whereClause}
+      `;
+      
+      const [countResult] = await db.execute<RowDataPacket[]>(countQuery, queryParams);
       const total = countResult[0]?.total || 0;
       
-      return { entries, total };
+      return {
+        entries,
+        total,
+        filters_applied: filters
+      };
     } catch (error) {
-      console.error("Error finding inventory entries:", error);
+      console.error("Error finding inventory entries with filters:", error);
       throw ERRORS.DATABASE_ERROR;
     }
   }

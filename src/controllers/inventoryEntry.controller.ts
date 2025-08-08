@@ -8,27 +8,216 @@ import {
 import { ERRORS, handleUnknownError } from '../utils/error.ts';
 import inventoryEntryRepository from '../repositories/inventoryEntry.repository.ts';
 import auditLogRepository from '../repositories/auditLog.repository.ts';
-import { InventoryEntryUpdateParams } from '../models/inventoryEntries.model.ts';
+import { InventoryEntryUpdateParams, InventoryEntryFilters } from '../models/inventoryEntries.model.ts';
 import { productRepository } from '../repositories/product.repository.ts';
 import { productFormulaRepository } from '../repositories/productFormula.repository.ts';
 
 /**
- * Get all inventory entries with pagination
+ * Get all inventory entries with comprehensive filtering and pagination
  */
 export const getAllEntries = async (req: Request, res: Response): Promise<void> => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
+    // Parse and validate filter parameters
+    const filters: InventoryEntryFilters = {};
     
-    const { entries, total } = await inventoryEntryRepository.findAll(page, limit);
+    // Pagination
+    if (req.query.page) {
+      const page = parseInt(req.query.page as string);
+      if (isNaN(page) || page < 1) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: ERRORS.INVALID_QUERY_PARAMETER.code,
+            message: "Page must be a positive integer"
+          }
+        });
+        return;
+      }
+      filters.page = page;
+    }
+    
+    if (req.query.limit) {
+      const limit = parseInt(req.query.limit as string);
+      if (isNaN(limit) || limit < 1 || limit > 100) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: ERRORS.INVALID_QUERY_PARAMETER.code,
+            message: "Limit must be between 1 and 100"
+          }
+        });
+        return;
+      }
+      filters.limit = limit;
+    }
+    
+    // Search filter
+    if (req.query.search) {
+      filters.search = req.query.search as string;
+    }
+    
+    // Entry type filter
+    if (req.query.entry_type) {
+      const entryType = req.query.entry_type as string;
+      if (!['manual_in', 'manual_out', 'manufacturing_in', 'manufacturing_out'].includes(entryType)) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: ERRORS.INVALID_QUERY_PARAMETER.code,
+            message: "Invalid entry_type. Must be one of: manual_in, manual_out, manufacturing_in, manufacturing_out"
+          }
+        });
+        return;
+      }
+      filters.entry_type = entryType as any;
+    }
+    
+    // User filter
+    if (req.query.user_id) {
+      const userId = parseInt(req.query.user_id as string);
+      if (isNaN(userId)) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: ERRORS.INVALID_QUERY_PARAMETER.code,
+            message: "user_id must be a valid number"
+          }
+        });
+        return;
+      }
+      filters.user_id = userId;
+    }
+    
+    // Location filter
+    if (req.query.location_id) {
+      const locationId = parseInt(req.query.location_id as string);
+      if (isNaN(locationId)) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: ERRORS.INVALID_QUERY_PARAMETER.code,
+            message: "location_id must be a valid number"
+          }
+        });
+        return;
+      }
+      filters.location_id = locationId;
+    }
+    
+    // Reference ID filter
+    if (req.query.reference_id) {
+      filters.reference_id = req.query.reference_id as string;
+    }
+    
+    // Product ID filter
+    if (req.query.product_id) {
+      const productId = parseInt(req.query.product_id as string);
+      if (isNaN(productId)) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: ERRORS.INVALID_QUERY_PARAMETER.code,
+            message: "product_id must be a valid number"
+          }
+        });
+        return;
+      }
+      filters.product_id = productId;
+    }
+    
+    // Category filter
+    if (req.query.category) {
+      const category = req.query.category as string;
+      if (!['raw', 'semi', 'finished'].includes(category)) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: ERRORS.INVALID_QUERY_PARAMETER.code,
+            message: "Invalid category. Must be one of: raw, semi, finished"
+          }
+        });
+        return;
+      }
+      filters.category = category as any;
+    }
+    
+    // Subcategory filter
+    if (req.query.subcategory_id) {
+      const subcategoryId = parseInt(req.query.subcategory_id as string);
+      if (isNaN(subcategoryId)) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: ERRORS.INVALID_QUERY_PARAMETER.code,
+            message: "subcategory_id must be a valid number"
+          }
+        });
+        return;
+      }
+      filters.subcategory_id = subcategoryId;
+    }
+    
+    // Date range filters
+    if (req.query.date_from) {
+      const dateFrom = new Date(req.query.date_from as string);
+      if (isNaN(dateFrom.getTime())) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: ERRORS.INVALID_QUERY_PARAMETER.code,
+            message: "date_from must be a valid ISO date string"
+          }
+        });
+        return;
+      }
+      filters.date_from = req.query.date_from as string;
+    }
+    
+    if (req.query.date_to) {
+      const dateTo = new Date(req.query.date_to as string);
+      if (isNaN(dateTo.getTime())) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: ERRORS.INVALID_QUERY_PARAMETER.code,
+            message: "date_to must be a valid ISO date string"
+          }
+        });
+        return;
+      }
+      filters.date_to = req.query.date_to as string;
+    }
+    
+    // Days filter (last N days)
+    if (req.query.days) {
+      const days = parseInt(req.query.days as string);
+      if (isNaN(days) || days < 1) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: ERRORS.INVALID_QUERY_PARAMETER.code,
+            message: "days must be a positive integer"
+          }
+        });
+        return;
+      }
+      filters.days = days;
+    }
+    
+    // Get filtered entries
+    const result = await inventoryEntryRepository.findAllWithFilters(filters);
+    
+    const page = filters.page || 1;
+    const limit = filters.limit || 100;
     
     res.json(responseWithMeta(
-      entries, 
+      result.entries, 
       {
         page,
         limit,
-        total,
-        pages: Math.ceil(total / limit)
+        total: result.total,
+        pages: Math.ceil(result.total / limit),
+        filters_applied: result.filters_applied
       }, 
       'Inventory entries retrieved successfully'
     ));
@@ -107,7 +296,7 @@ export const getProductEntries = async (req: Request, res: Response): Promise<vo
     }
     
     const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
+    const limit = parseInt(req.query.limit as string) || 100;
     
     const { entries, total } = await inventoryEntryRepository.findByProduct(
       productId, 
