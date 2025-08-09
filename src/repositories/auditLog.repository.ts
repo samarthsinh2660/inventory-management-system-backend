@@ -1,98 +1,200 @@
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { db } from "../database/db.ts";
 import { ERRORS } from "../utils/error.ts";
-import { AuditLog, AuditLogCreateParams, AuditLogFilter } from "../models/auditLogs.model.ts";
+import { AuditLog, AuditLogCreateParams, AuditLogFilter, AuditLogFilters, FilteredAuditLogsResponse } from "../models/auditLogs.model.ts";
 import inventoryEntryRepository from "./inventoryEntry.repository.ts";
 import { InventoryEntryCreateParams } from "../models/inventoryEntries.model.ts";
 
 export class AuditLogRepository {
   
   /**
-   * Finds all audit logs with optional filtering and pagination
+   * Finds all audit logs with optional filtering and pagination (legacy method)
    */
   async findAll(
     filter: AuditLogFilter = {}
   ): Promise<{ logs: AuditLog[], total: number }> {
+    // Use the new filtering method with converted filters for backward compatibility
+    const newFilters: AuditLogFilters = {
+      page: filter.page,
+      limit: filter.limit,
+      action: filter.action,
+      user_id: filter.user_id,
+      date_from: filter.start_date,
+      date_to: filter.end_date,
+      is_flag: filter.is_flag
+    };
+    
+    const result = await this.findAllWithFilters(newFilters);
+    return { logs: result.logs, total: result.total };
+  }
+
+  /**
+   * Finds all audit logs with comprehensive filtering and pagination
+   */
+  async findAllWithFilters(filters: AuditLogFilters): Promise<FilteredAuditLogsResponse> {
     try {
-      const { 
-        entry_id, 
-        action, 
-        user_id,
-        start_date,
-        end_date,
-        page = 1, 
-        limit = 10 
-      } = filter;
-      
+      const page = filters.page || 1;
+      const limit = Math.min(filters.limit || 100, 100); // Cap at 100
       const offset = (page - 1) * limit;
       
-      // Build the WHERE clause dynamically
-      const whereClauses = [];
-      const params: any[] = [];
-      
-      if (entry_id) {
-        whereClauses.push('al.entry_id = ?');
-        params.push(Number(entry_id));
+      // Build WHERE conditions and parameters
+      const whereConditions: string[] = [];
+      const queryParams: any[] = [];
+      const filtersApplied: { [key: string]: any } = {};
+
+      // Determine if we need joins based on filters
+      const needsInventoryJoin = filters.search || filters.location_id || filters.reference_id || 
+                                filters.product_id || filters.category || filters.subcategory_id;
+
+      // Search filter - comprehensive search across all relevant fields
+      if (filters.search) {
+        const searchTerm = `%${filters.search}%`;
+        
+        if (needsInventoryJoin) {
+          // When inventory joins are available, search across all fields
+          whereConditions.push(`(
+            u.username LIKE ? OR 
+            u.email LIKE ? OR
+            p.name LIKE ? OR 
+            l.name LIKE ? OR
+            ie.notes LIKE ? OR 
+            ie.reference_id LIKE ? OR
+            al.reason LIKE ? OR
+            al.action LIKE ?
+          )`);
+          queryParams.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+        } else {
+          // When no inventory joins, search basic audit log and user fields
+          whereConditions.push(`(
+            u.username LIKE ? OR 
+            u.email LIKE ? OR
+            al.reason LIKE ? OR
+            al.action LIKE ?
+          )`);
+          queryParams.push(searchTerm, searchTerm, searchTerm, searchTerm);
+        }
+        
+        filtersApplied.search = filters.search;
       }
-      
-      if (action) {
-        whereClauses.push('al.action = ?');
-        params.push(String(action));
+
+      // Action filter
+      if (filters.action) {
+        whereConditions.push('al.action = ?');
+        queryParams.push(filters.action);
+        filtersApplied.action = filters.action;
       }
-      
-      if (user_id) {
-        whereClauses.push('al.user_id = ?');
-        params.push(Number(user_id));
+
+      // User filter
+      if (filters.user_id) {
+        whereConditions.push('al.user_id = ?');
+        queryParams.push(filters.user_id);
+        filtersApplied.user_id = filters.user_id;
       }
-      
-      if (start_date) {
-        whereClauses.push('al.timestamp >= ?');
-        params.push(new Date(start_date));
+
+      // Location filter
+      if (filters.location_id) {
+        whereConditions.push('ie.location_id = ?');
+        queryParams.push(filters.location_id);
+        filtersApplied.location_id = filters.location_id;
       }
-      
-      if (end_date) {
-        whereClauses.push('al.timestamp <= ?');
-        params.push(new Date(end_date));
+
+      // Flag filter
+      if (typeof filters.is_flag === 'boolean') {
+        whereConditions.push('al.is_flag = ?');
+        queryParams.push(filters.is_flag);
+        filtersApplied.is_flag = filters.is_flag;
       }
-      
-      if (typeof filter.is_flag === 'boolean') {
-        whereClauses.push('al.is_flag = ?');
-        params.push(filter.is_flag);
+
+      // Reference ID filter
+      if (filters.reference_id) {
+        whereConditions.push('ie.reference_id = ?');
+        queryParams.push(filters.reference_id);
+        filtersApplied.reference_id = filters.reference_id;
       }
+
+      // Product hierarchy filters
+      if (filters.product_id) {
+        whereConditions.push('ie.product_id = ?');
+        queryParams.push(filters.product_id);
+        filtersApplied.product_id = filters.product_id;
+      }
+
+      if (filters.category) {
+        whereConditions.push('sc.category = ?');
+        queryParams.push(filters.category);
+        filtersApplied.category = filters.category;
+      }
+
+      if (filters.subcategory_id) {
+        whereConditions.push('p.subcategory_id = ?');
+        queryParams.push(filters.subcategory_id);
+        filtersApplied.subcategory_id = filters.subcategory_id;
+      }
+
+      // Date range filters
+      if (filters.date_from) {
+        whereConditions.push('al.timestamp >= ?');
+        queryParams.push(filters.date_from);
+        filtersApplied.date_from = filters.date_from.toISOString().split('T')[0];
+      }
+
+      if (filters.date_to) {
+        whereConditions.push('al.timestamp <= ?');
+        queryParams.push(filters.date_to);
+        filtersApplied.date_to = filters.date_to.toISOString().split('T')[0];
+      }
+
+      // Last N days filter
+      if (filters.days) {
+        const daysAgo = new Date();
+        daysAgo.setDate(daysAgo.getDate() - filters.days);
+        whereConditions.push('al.timestamp >= ?');
+        queryParams.push(daysAgo);
+        filtersApplied.days = filters.days;
+      }
+
+      // Build the base query with conditional joins
+      let baseQuery = `FROM AuditLogs al JOIN Users u ON al.user_id = u.id`;
       
-      // Construct the WHERE part of the query
-      const whereClause = whereClauses.length > 0 
-        ? `WHERE ${whereClauses.join(' AND ')}` 
+      if (needsInventoryJoin) {
+        baseQuery += ` JOIN InventoryEntries ie ON al.entry_id = ie.id`;
+        baseQuery += ` JOIN Products p ON ie.product_id = p.id`;
+        baseQuery += ` JOIN Locations l ON ie.location_id = l.id`;
+        
+        if (filters.category) {
+          baseQuery += ` JOIN Subcategories sc ON p.subcategory_id = sc.id`;
+        }
+      }
+
+      const whereClause = whereConditions.length > 0 
+        ? ` WHERE ${whereConditions.join(' AND ')}` 
         : '';
+
+      // Main query to get audit logs
+      let selectFields = `al.*, u.username`;
+      if (needsInventoryJoin) {
+        selectFields += `, p.name as product_name, l.name as location_name, ie.reference_id as entry_reference_id`;
+      }
       
-      // Use direct integer values in the query string for pagination
-      const query = `
-        SELECT al.*, u.username
-        FROM AuditLogs al
-        JOIN Users u ON al.user_id = u.id
-        ${whereClause}
-        ORDER BY al.timestamp DESC
-        LIMIT ${parseInt(limit.toString())} OFFSET ${parseInt(offset.toString())}
-      `;
-      
-      // Execute the query with just the WHERE clause parameters
-      const [logs] = await db.execute<AuditLog[]>(query, params);
-      
-      // Count total matching logs
-      const countQuery = `
-        SELECT COUNT(*) as total 
-        FROM AuditLogs al
-        ${whereClause}
-      `;
-      
-      const [countResult] = await db.execute<RowDataPacket[]>(countQuery, params);
-      
+      const selectQuery = `SELECT DISTINCT ${selectFields} ${baseQuery}${whereClause} ORDER BY al.timestamp DESC LIMIT ${limit} OFFSET ${offset}`;
+
+    
+      const [logs] = await db.execute<AuditLog[]>(selectQuery, queryParams);
+
+      // Count query for total results
+      const countQuery = `SELECT COUNT(DISTINCT al.id) as total ${baseQuery}${whereClause}`;
+
+      const [countResult] = await db.execute<RowDataPacket[]>(countQuery, queryParams);
       const total = countResult[0]?.total || 0;
-      
-      return { logs, total };
+
+      return { 
+        logs, 
+        total, 
+        filters_applied: filtersApplied 
+      };
     } catch (error) {
-      console.error("Error finding audit logs:", error);
-      throw ERRORS.DATABASE_ERROR;
+      console.error("Error finding audit logs with filters:", error);
+      throw ERRORS.AUDIT_LOG_FILTER_SEARCH_FAILED;
     }
   }
   

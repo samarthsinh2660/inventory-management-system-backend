@@ -99,8 +99,8 @@ export const ERRORS = {
     PRODUCT_LOCATION_REQUIRED: new RequestError("Product location is required", 30013, 400),
     PRODUCT_IN_USE: new RequestError("Product is used as a component in one or more formulas and cannot be deleted", 30014, 400),
     PRODUCT_HAS_FORMULA: new RequestError("Product has a formula defined and cannot be deleted directly", 30015, 400),
+    INVENTORY_FILTER_SEARCH_FAILED: new RequestError("Failed to search inventory entries", 70013, 500),
     PRODUCT_SEARCH_FAILED: new RequestError("Failed to search products", 30016, 500),
-    
     // Location Management Errors (4xxxx)
     LOCATION_NOT_FOUND: new RequestError("Location not found", 40001, 404), 
     LOCATION_CREATION_FAILED: new RequestError("Failed to create location", 40002, 500),
@@ -165,6 +165,8 @@ export const ERRORS = {
     AUDIT_LOG_MASTER_ONLY: new RequestError("Only master users can modify audit logs", 80005, 403),
     AUDIT_LOG_ENTRY_REQUIRED: new RequestError("Inventory entry ID is required", 80006, 400),
     AUDIT_LOG_ACTION_REQUIRED: new RequestError("Action type is required", 80007, 400),
+    AUDIT_LOG_INVALID_FILTER: new RequestError("Invalid audit log filter parameter", 80008, 400),
+    AUDIT_LOG_FILTER_SEARCH_FAILED: new RequestError("Failed to search audit logs", 80009, 500),
     
     // Alert and Notification Management Errors (9xxxx)
     ALERT_NOT_FOUND: new RequestError("Alert not found", 90001, 404),

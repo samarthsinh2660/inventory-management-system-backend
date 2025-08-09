@@ -40,6 +40,7 @@ export interface AuditLogCreateParams {
   reason?: string;
 }
 
+// Legacy filter interface for backward compatibility
 export interface AuditLogFilter {
   entry_id?: number;
   action?: 'create' | 'update' | 'delete';
@@ -49,6 +50,50 @@ export interface AuditLogFilter {
   page?: number;
   limit?: number;
   is_flag?: boolean;
+}
+
+// Comprehensive filters interface for audit logs
+export interface AuditLogFilters {
+  // Pagination
+  page?: number;
+  limit?: number;
+  
+  // Search filter
+  search?: string;
+  
+  // Entry type filter (action)
+  action?: 'create' | 'update' | 'delete';
+  
+  // User filter
+  user_id?: number;
+  
+  // Location filter
+  location_id?: number;
+  
+  // Flag filter
+  is_flag?: boolean;
+  
+  // Reference ID filter
+  reference_id?: string;
+  
+  // Product hierarchy filters
+  product_id?: number;
+  category?: 'raw' | 'semi' | 'finished';
+  subcategory_id?: number;
+  
+  // Timestamp filters
+  date_from?: Date;
+  date_to?: Date;
+  days?: number; // Last N days
+}
+
+// Response interface for filtered audit logs
+export interface FilteredAuditLogsResponse {
+  logs: AuditLog[];
+  total: number;
+  filters_applied: {
+    [key: string]: any;
+  };
 }
 
 export interface AuditLogFlagUpdate {

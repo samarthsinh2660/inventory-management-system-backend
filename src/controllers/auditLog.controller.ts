@@ -4,55 +4,154 @@ import {
   deletedResponse, 
   responseWithMeta 
 } from '../utils/response.ts';
-import { ERRORS, handleUnknownError } from '../utils/error.ts';
+import { ERRORS, handleUnknownError, RequestError } from '../utils/error.ts';
 import auditLogRepository from '../repositories/auditLog.repository.ts';
-import { AuditLogFilter } from '../models/auditLogs.model.ts'; 
+import { AuditLogFilter, AuditLogFilters } from '../models/auditLogs.model.ts'; 
 
 /**
- * Get all audit logs with filtering and pagination
+ * Get all audit logs with comprehensive filtering and pagination
  */
 export const getAllLogs = async (req: Request, res: Response): Promise<void> => {
   try {
-    const filter: AuditLogFilter = {};
-    
-    // Process query parameters for filtering
-    if (req.query.entry_id) {
-      filter.entry_id = parseInt(req.query.entry_id as string);
-    }
-    
-    if (req.query.action) {
-      filter.action = req.query.action as 'create' | 'update' | 'delete';
-    }
-    
-    if (req.query.user_id) {
-      filter.user_id = parseInt(req.query.user_id as string);
-    }
-    
-    if (req.query.start_date) {
-      filter.start_date = new Date(req.query.start_date as string);
-    }
-    
-    if (req.query.end_date) {
-      filter.end_date = new Date(req.query.end_date as string);
-    }
-    
-    if (req.query.is_flag !== undefined) {
-      filter.is_flag = req.query.is_flag === 'true';
-    }
+    // Parse and validate filter parameters
+    const filters: AuditLogFilters = {};
     
     // Pagination
-    filter.page = parseInt(req.query.page as string) || 1;
-    filter.limit = parseInt(req.query.limit as string) || 10;
+    if (req.query.page) {
+      const page = parseInt(req.query.page as string);
+      if (isNaN(page) || page < 1) {
+        throw new RequestError('Page must be a positive integer', ERRORS.AUDIT_LOG_INVALID_FILTER.code, 400);
+      }
+      filters.page = page;
+    }
     
-    const { logs, total } = await auditLogRepository.findAll(filter);
+    if (req.query.limit) {
+      const limit = parseInt(req.query.limit as string);
+      if (isNaN(limit) || limit < 1 || limit > 100) {
+        throw new RequestError('Limit must be between 1 and 100', ERRORS.AUDIT_LOG_INVALID_FILTER.code, 400);
+      }
+      filters.limit = limit;
+    }
+    
+    // Search filter
+    if (req.query.search) {
+      const search = (req.query.search as string).trim();
+      if (search.length > 0) {
+        filters.search = search;
+      }
+    }
+    
+    // Action filter
+    if (req.query.action) {
+      const action = req.query.action as string;
+      if (!['create', 'update', 'delete'].includes(action)) {
+        throw new RequestError('Action must be create, update, or delete', ERRORS.AUDIT_LOG_INVALID_FILTER.code, 400);
+      }
+      filters.action = action as 'create' | 'update' | 'delete';
+    }
+    
+    // User filter
+    if (req.query.user_id) {
+      const userId = parseInt(req.query.user_id as string);
+      if (isNaN(userId) || userId < 1) {
+        throw new RequestError('User ID must be a positive integer', ERRORS.AUDIT_LOG_INVALID_FILTER.code, 400);
+      }
+      filters.user_id = userId;
+    }
+    
+    // Location filter
+    if (req.query.location_id) {
+      const locationId = parseInt(req.query.location_id as string);
+      if (isNaN(locationId) || locationId < 1) {
+        throw new RequestError('Location ID must be a positive integer', ERRORS.AUDIT_LOG_INVALID_FILTER.code, 400);
+      }
+      filters.location_id = locationId;
+    }
+    
+    // Flag filter
+    if (req.query.is_flag !== undefined) {
+      const flagValue = req.query.is_flag as string;
+      if (!['true', 'false'].includes(flagValue)) {
+        throw new RequestError('is_flag must be true or false', ERRORS.AUDIT_LOG_INVALID_FILTER.code, 400);
+      }
+      filters.is_flag = flagValue === 'true';
+    }
+    
+    // Reference ID filter
+    if (req.query.reference_id) {
+      filters.reference_id = req.query.reference_id as string;
+    }
+    
+    // Product hierarchy filters
+    if (req.query.product_id) {
+      const productId = parseInt(req.query.product_id as string);
+      if (isNaN(productId) || productId < 1) {
+        throw new RequestError('Product ID must be a positive integer', ERRORS.AUDIT_LOG_INVALID_FILTER.code, 400);
+      }
+      filters.product_id = productId;
+    }
+    
+    if (req.query.category) {
+      const category = req.query.category as string;
+      if (!['raw', 'semi', 'finished'].includes(category)) {
+        throw new RequestError('Category must be raw, semi, or finished', ERRORS.AUDIT_LOG_INVALID_FILTER.code, 400);
+      }
+      filters.category = category as 'raw' | 'semi' | 'finished';
+    }
+    
+    if (req.query.subcategory_id) {
+      const subcategoryId = parseInt(req.query.subcategory_id as string);
+      if (isNaN(subcategoryId) || subcategoryId < 1) {
+        throw new RequestError('Subcategory ID must be a positive integer', ERRORS.AUDIT_LOG_INVALID_FILTER.code, 400);
+      }
+      filters.subcategory_id = subcategoryId;
+    }
+    
+    // Date range filters validation
+    if (req.query.date_from) {
+      const dateFrom = new Date(req.query.date_from as string);
+      if (isNaN(dateFrom.getTime())) {
+        throw new RequestError('Invalid date_from format. Use YYYY-MM-DD', ERRORS.AUDIT_LOG_INVALID_FILTER.code, 400);
+      }
+      filters.date_from = dateFrom;
+    }
+    
+    if (req.query.date_to) {
+      const dateTo = new Date(req.query.date_to as string);
+      if (isNaN(dateTo.getTime())) {
+        throw new RequestError('Invalid date_to format. Use YYYY-MM-DD', ERRORS.AUDIT_LOG_INVALID_FILTER.code, 400);
+      }
+      filters.date_to = dateTo;
+    }
+    
+    // Last N days filter
+    if (req.query.days) {
+      const days = parseInt(req.query.days as string);
+      if (isNaN(days) || days < 1) {
+        throw new RequestError('Days must be a positive integer', ERRORS.AUDIT_LOG_INVALID_FILTER.code, 400);
+      }
+      filters.days = days;
+    }
+    
+    // Validate mutual exclusivity of date filters
+    if (filters.days && (filters.date_from || filters.date_to)) {
+      throw new RequestError('Cannot use days filter with date_from/date_to filters', ERRORS.AUDIT_LOG_INVALID_FILTER.code, 400);
+    }
+    
+    // Call repository with comprehensive filters
+    const result = await auditLogRepository.findAllWithFilters(filters);
+    
+    const page = filters.page || 1;
+    const limit = filters.limit || 100;
     
     res.json(responseWithMeta(
-      logs, 
+      result.logs, 
       {
-        page: filter.page,
-        limit: filter.limit,
-        total,
-        pages: Math.ceil(total / (filter.limit || 10))
+        page,
+        limit,
+        total: result.total,
+        pages: Math.ceil(result.total / limit),
+        filters_applied: result.filters_applied
       }, 
       'Audit logs retrieved successfully'
     ));

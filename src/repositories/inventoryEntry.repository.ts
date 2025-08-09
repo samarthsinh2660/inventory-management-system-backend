@@ -36,15 +36,19 @@ export class InventoryEntryRepository {
       const whereConditions: string[] = [];
       const queryParams: any[] = [];
       
-      // Search filter - searches across product name, notes, and reference_id
+      // Search filter - comprehensive search across all relevant fields
       if (filters.search) {
         whereConditions.push(`(
           p.name LIKE ? OR 
           ie.notes LIKE ? OR 
-          ie.reference_id LIKE ?
+          ie.reference_id LIKE ? OR
+          ie.entry_type LIKE ? OR
+          u.username LIKE ? OR
+          u.email LIKE ? OR
+          l.name LIKE ?
         )`);
         const searchTerm = `%${filters.search}%`;
-        queryParams.push(searchTerm, searchTerm, searchTerm);
+        queryParams.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
       }
       
       // Entry type filter
