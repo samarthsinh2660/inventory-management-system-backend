@@ -11,6 +11,7 @@ import auditLogRepository from '../repositories/auditLog.repository.ts';
 import { InventoryEntryUpdateParams, InventoryEntryFilters } from '../models/inventoryEntries.model.ts';
 import { productRepository } from '../repositories/product.repository.ts';
 import { productFormulaRepository } from '../repositories/productFormula.repository.ts';
+import alertService from '../services/alert.service.ts';
 
 /**
  * Get all inventory entries with comprehensive filtering and pagination
@@ -440,6 +441,9 @@ export const createEntry = async (req: Request , res: Response): Promise<void> =
             )
           ]);
           
+          // Check for stock threshold alerts after creating entries
+          await alertService.checkAndSendAlerts();
+          
           res.status(201).json(createdResponse({
             mainEntry: entryResult.mainEntry,
             componentEntries: entryResult.componentEntries
@@ -467,6 +471,9 @@ export const createEntry = async (req: Request , res: Response): Promise<void> =
       req.user?.id || 0, // Use 0 as fallback for system-generated entries
       req.body.reason
     );
+    
+    // Check for stock threshold alerts after creating entry
+    await alertService.checkAndSendAlerts();
     
     res.status(201).json(createdResponse(entry, 'Inventory entry created successfully'));
   } catch (error) {
@@ -554,6 +561,9 @@ export const updateEntry = async (req: Request, res: Response): Promise<void> =>
       req.body.reason
     );
     
+    // Check for stock threshold alerts after updating entry
+    await alertService.checkAndSendAlerts();
+    
     res.json(successResponse(updatedEntry, 'Inventory entry updated successfully'));
   } catch (error) {
     const requestError = handleUnknownError(error);
@@ -637,6 +647,9 @@ export const deleteEntry = async (req: Request , res: Response): Promise<void> =
       req.user?.id || 0, // Use 0 as fallback for system-generated entries
       req.body.reason
     );
+    
+    // Check for stock threshold alerts after deleting entry
+    await alertService.checkAndSendAlerts();
     
     res.json(deletedResponse('Inventory entry deleted successfully'));
   } catch (error) {

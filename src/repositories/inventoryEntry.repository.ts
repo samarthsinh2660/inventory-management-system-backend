@@ -1,6 +1,6 @@
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { db } from "../database/db.ts";
-import { ERRORS } from "../utils/error.ts";
+import { ERRORS, RequestError } from "../utils/error.ts";
 import { 
   InventoryEntry, 
   InventoryEntryCreateParams, 
@@ -188,7 +188,41 @@ export class InventoryEntryRepository {
     try {
       await connection.beginTransaction();
       
-      // Check if the entry with negative quantity would create negative inventory
+      // Validate that the product can only have inventory entries at its assigned location
+      const [productLocation] = await connection.execute<RowDataPacket[]>(`
+        SELECT location_id, name 
+        FROM Products 
+        WHERE id = ?
+      `, [entryData.product_id]);
+      
+      if (productLocation.length === 0) {
+        throw ERRORS.PRODUCT_NOT_FOUND;
+      }
+      
+      if (productLocation[0].location_id !== entryData.location_id) {
+        throw ERRORS.PRODUCT_LOCATION_MISMATCH;
+      }
+      
+      // Check if outbound operations would create negative inventory
+      if (entryData.entry_type === 'manual_out' || entryData.entry_type === 'manufacturing_out') {
+        const [currentBalance] = await connection.execute<RowDataPacket[]>(`
+          SELECT COALESCE(SUM(
+            CASE 
+              WHEN entry_type IN ('manual_in', 'manufacturing_in') THEN quantity
+              ELSE -quantity
+            END
+          ), 0) as current_balance 
+          FROM InventoryEntries 
+          WHERE product_id = ? AND location_id = ?
+        `, [entryData.product_id, entryData.location_id]);
+        
+        const currentStock = currentBalance[0]?.current_balance || 0;
+        if (currentStock < entryData.quantity) {
+          throw ERRORS.INVENTORY_NEGATIVE_QUANTITY_ERROR;
+        }
+      }
+      
+      // Legacy check for direct negative quantities (keeping for backward compatibility)
       if (entryData.quantity < 0) {
         const [currentBalance] = await connection.execute<RowDataPacket[]>(`
           SELECT COALESCE(SUM(quantity), 0) as current_balance 
@@ -224,24 +258,18 @@ export class InventoryEntryRepository {
       // Return the created entry
       const entry = await this.findById(entryId) as InventoryEntry;
       
-      // After successfully creating the entry, check if there are any threshold alerts
-      // Do this outside the transaction to avoid slowing down the main operation
-      setImmediate(() => {
-        import('../services/alert.service.ts')
-          .then(module => {
-            const alertService = module.default;
-            alertService.checkAndSendAlerts()
-              .catch(err => console.error("Error checking alerts after inventory change:", err));
-          })
-          .catch(err => console.error("Error importing alert service:", err));
-      });
+      // Alert checking is now handled in the controller layer
       
       return entry;
     } catch (error) {
       await connection.rollback();
       console.error("Error creating inventory entry:", error);
       
-      if (error === ERRORS.INVENTORY_NEGATIVE_QUANTITY_ERROR) {
+      // Preserve specific validation errors
+      if (error === ERRORS.INVENTORY_NEGATIVE_QUANTITY_ERROR ||
+          error === ERRORS.PRODUCT_LOCATION_MISMATCH ||
+          error === ERRORS.PRODUCT_NOT_FOUND ||
+          error === ERRORS.INSUFFICIENT_COMPONENT_INVENTORY) {
         throw error;
       }
       
@@ -539,6 +567,21 @@ LEFT JOIN
     try {
       await connection.beginTransaction();
       
+      // Validate that the main product can only have inventory entries at its assigned location
+      const [mainProductLocation] = await connection.execute<RowDataPacket[]>(`
+        SELECT location_id, name 
+        FROM Products 
+        WHERE id = ?
+      `, [mainEntryData.product_id]);
+      
+      if (mainProductLocation.length === 0) {
+        throw ERRORS.PRODUCT_NOT_FOUND;
+      }
+      
+      if (mainProductLocation[0].location_id !== mainEntryData.location_id) {
+        throw ERRORS.PRODUCT_LOCATION_MISMATCH;
+      }
+      
       // First, verify that all components have sufficient inventory to be deducted
       for (const component of formulaComponents) {
         // Calculate how much of this component will be used
@@ -546,17 +589,24 @@ LEFT JOIN
         
         // Check if there's enough inventory for this component
         const [currentBalance] = await connection.execute<RowDataPacket[]>(`
-          SELECT COALESCE(SUM(quantity), 0) as current_balance 
+          SELECT COALESCE(SUM(
+            CASE 
+              WHEN entry_type IN ('manual_in', 'manufacturing_in') THEN quantity
+              ELSE -quantity
+            END
+          ), 0) as current_balance 
           FROM InventoryEntries 
           WHERE product_id = ? AND location_id = ?
         `, [component.component_id, mainEntryData.location_id]);
         
-        const balance = currentBalance[0]?.current_balance || 0;
-        if (balance - componentQuantity < 0) {
-          throw {
-            ...ERRORS.INSUFFICIENT_COMPONENT_INVENTORY,
-            message: `Insufficient inventory for component ${component.component_name || component.component_id}. Required: ${componentQuantity}, Available: ${balance}`
-          };
+        const availableStock = currentBalance[0]?.current_balance || 0;
+        if (availableStock < componentQuantity) {
+          const customError = new RequestError(
+            `Insufficient inventory for component ${component.component_name || component.component_id}. Required: ${componentQuantity}, Available: ${availableStock}`,
+            ERRORS.INSUFFICIENT_COMPONENT_INVENTORY.code,
+            ERRORS.INSUFFICIENT_COMPONENT_INVENTORY.statusCode
+          );
+          throw customError;
         }
       }
       
@@ -614,25 +664,18 @@ LEFT JOIN
         componentEntries.push(entry);
       }
       
-      // After successfully creating entries, check if there are any threshold alerts
-      // Do this outside the transaction to avoid slowing down the main operation
-      setImmediate(() => {
-        import('../services/alert.service.ts')
-          .then(alertService => {
-            // Check threshold alerts for all affected products
-            alertService.default.checkAndSendAlerts();
-          })
-          .catch(error => {
-            console.error("Error checking stock thresholds:", error);
-          });
-      });
+      // Alert checking is now handled in the controller layer
       
       return { mainEntry, componentEntries };
     } catch (error) {
       await connection.rollback();
       console.error("Error creating inventory entry with formula components:", error);
       
-      if (error === ERRORS.INSUFFICIENT_COMPONENT_INVENTORY || 
+      // Preserve specific validation errors
+      if (error === ERRORS.INSUFFICIENT_COMPONENT_INVENTORY ||
+          error === ERRORS.PRODUCT_LOCATION_MISMATCH ||
+          error === ERRORS.PRODUCT_NOT_FOUND ||
+          error === ERRORS.INVENTORY_NEGATIVE_QUANTITY_ERROR ||
           (error as any)?.code === ERRORS.INSUFFICIENT_COMPONENT_INVENTORY.code) {
         throw error;
       }

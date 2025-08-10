@@ -150,6 +150,7 @@ export const ERRORS = {
     INVENTORY_ENTRY_TYPE_REQUIRED: new RequestError("Entry type is required", 70009, 400),
     INVENTORY_BALANCE_RETRIEVAL_FAILED: new RequestError("Failed to retrieve inventory balance", 70010, 500),
     INSUFFICIENT_COMPONENT_INVENTORY: new RequestError("Insufficient inventory for one or more formula components", 70011, 400),
+    PRODUCT_LOCATION_MISMATCH: new RequestError("Product can only have inventory entries at its assigned location", 70012, 400),
     PRODUCT_REQUIRED: new RequestError("Product is required for inventory entry", 70007, 400), // Alias for INVENTORY_ENTRY_PRODUCT_REQUIRED
     QUANTITY_REQUIRED: new RequestError("Inventory quantity must be a non-zero number", 70006, 400), // Alias for INVENTORY_ENTRY_INVALID_QUANTITY
     ENTRY_TYPE_REQUIRED: new RequestError("Entry type is required", 70009, 400), // Alias for INVENTORY_ENTRY_TYPE_REQUIRED

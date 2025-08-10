@@ -81,14 +81,18 @@ class AlertService {
 
   /**
    * Check for products below threshold and notify masters if any are found
+   * Also resolve alerts and notifications for products that are now above threshold
    * This is the main method to be called after inventory changes
    */
   async checkAndSendAlerts(): Promise<void> {
     try {
       const lowStockProducts = await this.getProductsBelowThreshold();
       
+      // Resolve alerts and notifications for products that are now above threshold
+      await this.resolveRefilledAlerts(lowStockProducts);
+      
       if (lowStockProducts.length === 0) {
-        return; // No alerts needed
+        return; // No new alerts needed
       }
       
       const masterUsers = await this.getMasterUsers();
@@ -161,46 +165,112 @@ class AlertService {
     masterUsers: User[]
   ): Promise<void> {
     try {
-      // For each product, create a single notification
+      // For each product, create or update notification
       for (const product of products) {
         // First check if we already have unread notifications for this product
         const [existingNotifications] = await db.execute<RowDataPacket[]>(
-          `SELECT id FROM Notifications 
+          `SELECT id, current_stock FROM Notifications 
            WHERE product_id = ? AND is_read = false`,
           [product.id]
         );
         
-        // Skip if we already have an unread notification for this product
-        if (existingNotifications.length > 0) {
-          continue;
-        }
-        
-        // Create a single notification for the product (visible to all master users)
+        // Create updated message with current stock level
         const message = `Low stock alert: ${product.name} is below minimum threshold (${product.current_stock}/${product.min_stock_threshold})`;
         
-        // First get the corresponding stock alert if available
-        const [stockAlerts] = await db.execute<RowDataPacket[]>(
-          'SELECT id FROM StockAlerts WHERE product_id = ? AND is_resolved = false',
-          [product.id]
-        );
-        
-        const stock_alert_id = stockAlerts.length > 0 ? stockAlerts[0].id : null;
-        
-        await db.execute(
-          `INSERT INTO Notifications (
-            product_id, stock_alert_id, message, current_stock, min_threshold
-          ) VALUES (?, ?, ?, ?, ?)`,
-          [
-            product.id,
-            stock_alert_id,
-            message,
-            product.current_stock,
-            product.min_stock_threshold
-          ]
-        );
+        if (existingNotifications.length > 0) {
+          // Update existing notification with current stock level and message
+          const existingNotification = existingNotifications[0];
+          
+          // Only update if the stock level has changed
+          if (existingNotification.current_stock !== product.current_stock) {
+            await db.execute(
+              `UPDATE Notifications 
+               SET current_stock = ?, message = ? 
+               WHERE id = ?`,
+              [
+                product.current_stock,
+                message,
+                existingNotification.id
+              ]
+            );
+          }
+        } else {
+          // Create new notification if none exists
+          // First get the corresponding stock alert if available
+          const [stockAlerts] = await db.execute<RowDataPacket[]>(
+            'SELECT id FROM StockAlerts WHERE product_id = ? AND is_resolved = false',
+            [product.id]
+          );
+          
+          const stock_alert_id = stockAlerts.length > 0 ? stockAlerts[0].id : null;
+          
+          await db.execute(
+            `INSERT INTO Notifications (
+              product_id, stock_alert_id, message, current_stock, min_threshold
+            ) VALUES (?, ?, ?, ?, ?)`,
+            [
+              product.id,
+              stock_alert_id,
+              message,
+              product.current_stock,
+              product.min_stock_threshold
+            ]
+          );
+        }
       }
     } catch (error) {
       console.error("Error creating in-app notifications:", error);
+    }
+  }
+  
+  /**
+   * Resolve alerts and notifications for products that are now above their threshold
+   */
+  private async resolveRefilledAlerts(currentLowStockProducts: LowStockProduct[]): Promise<void> {
+    try {
+      // Get all currently unresolved alerts
+      const [unresolvedAlerts] = await db.execute<RowDataPacket[]>(
+        'SELECT product_id FROM StockAlerts WHERE is_resolved = false'
+      );
+      
+      // Find products that had alerts but are no longer in the low stock list
+      const currentLowStockProductIds = new Set(currentLowStockProducts.map(p => p.id));
+      const productsToResolve = unresolvedAlerts
+        .map(alert => alert.product_id)
+        .filter(productId => !currentLowStockProductIds.has(productId));
+      
+      if (productsToResolve.length > 0) {
+        console.log(`RESOLVED: ${productsToResolve.length} products are now above minimum threshold`);
+        
+        // Resolve stock alerts for these products
+        for (const productId of productsToResolve) {
+          await db.execute(
+            'UPDATE StockAlerts SET is_resolved = true, resolved_at = NOW() WHERE product_id = ? AND is_resolved = false',
+            [productId]
+          );
+        }
+        
+        // Mark notifications as read for these products
+        for (const productId of productsToResolve) {
+          await db.execute(
+            'UPDATE Notifications SET is_read = true WHERE product_id = ? AND is_read = false',
+            [productId]
+          );
+        }
+        
+        // Log which products were resolved
+        for (const productId of productsToResolve) {
+          const [productInfo] = await db.execute<RowDataPacket[]>(
+            'SELECT name FROM Products WHERE id = ?',
+            [productId]
+          );
+          if (productInfo.length > 0) {
+            console.log(`Product: ${productInfo[0].name} - Alert resolved (stock refilled above threshold)`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error resolving refilled alerts:", error);
     }
   }
 }
