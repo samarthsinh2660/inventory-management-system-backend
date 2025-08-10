@@ -41,37 +41,18 @@ export class ProductRepository {
   }
 
   /**
-   * Get all products
+   * Get all products with optional filters
    */
-  async getAllProducts(): Promise<Product[]> {
-    const [products] = await db.execute(
-      `SELECT p.*, s.name as subcategory_name, l.name as location_name, pf.name as product_formula_name
-       FROM Products p
-       JOIN Subcategories s ON p.subcategory_id = s.id
-       JOIN Locations l ON p.location_id = l.id
-       LEFT JOIN ProductFormula pf ON p.product_formula_id = pf.id
-       ORDER BY p.name`
-    ) as [Product[], any];
-
-    return products;
+  async getAllProducts(filters?: ProductSearchParams): Promise<{ products: Product[], total: number }> {
+    // If no filters provided, use empty filters object
+    if (!filters) {
+      filters = {};
+    }
+    
+    return this.searchProducts(filters);
   }
 
-  /**
-   * Get products by category
-   */
-  async findByCategory(category: ProductCategory): Promise<Product[]> {
-    const [products] = await db.execute(
-      `SELECT p.*, s.name as subcategory_name, l.name as location_name 
-       FROM Products p
-       JOIN Subcategories s ON p.subcategory_id = s.id
-       JOIN Locations l ON p.location_id = l.id
-       WHERE p.category = ?
-       ORDER BY p.name`,
-      [category]
-    ) as [Product[], any];
 
-    return products;
-  }
 
   /**
    * Create a new product
@@ -355,11 +336,9 @@ export class ProductRepository {
       source_type,
       formula_id,
       component_id,
-      is_parent,
-      is_component,
       purchase_info_id,
       page = 1,
-      limit = 10
+      limit = 20
     } = filters;
 
     // Start building the query
@@ -380,9 +359,9 @@ export class ProductRepository {
 
     // Add filter conditions
     if (search) {
-      whereClauses.push('(p.name LIKE ? OR p.unit LIKE ? OR s.name LIKE ? OR l.name LIKE ?)');
+      whereClauses.push('(p.name LIKE ? OR p.unit LIKE ? OR s.name LIKE ? OR l.name LIKE ? OR pf.name LIKE ?)');
       const searchParam = `%${search}%`;
-      params.push(searchParam, searchParam, searchParam, searchParam);
+      params.push(searchParam, searchParam, searchParam, searchParam, searchParam);
     }
 
     if (category) {
@@ -414,29 +393,7 @@ export class ProductRepository {
       }
     }
 
-    // Formula-related filters - Use direct strings for EXISTS/NOT EXISTS clauses
-    if (is_parent !== undefined) {
-      if (is_parent) {
-        whereClauses.push('p.product_formula_id IS NOT NULL');
-      } else {
-        whereClauses.push('p.product_formula_id IS NULL');
-      }
-    }
-
-    if (is_component !== undefined) {
-      if (is_component) {
-        whereClauses.push(`EXISTS (
-          SELECT 1 FROM ProductFormula pf 
-          WHERE JSON_CONTAINS(pf.components, JSON_OBJECT('component_id', p.id))
-        )`);
-      } else {
-        whereClauses.push(`NOT EXISTS (
-          SELECT 1 FROM ProductFormula pf 
-          WHERE JSON_CONTAINS(pf.components, JSON_OBJECT('component_id', p.id))
-        )`);
-      }
-    }
-
+    // Formula-related filters
     if (formula_id !== undefined && formula_id !== null) {
       whereClauses.push('p.product_formula_id = ?');
       params.push(formula_id);
@@ -449,6 +406,8 @@ export class ProductRepository {
       )`);
       params.push(component_id);
     }
+
+
 
     // Assemble the where clause if needed
     let query = baseQuery;

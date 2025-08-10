@@ -5,17 +5,7 @@ import { ERRORS } from '../utils/error.ts';
 import { successResponse, listResponse, createdResponse, updatedResponse, deletedResponse } from '../utils/response.ts';
 import { ProductCategory, ProductSearchParams, SourceType } from '../models/products.model.ts';
 
-/**
- * Get all products
- */
-export const getAllProducts = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const products = await productRepository.getAllProducts();
-    res.json(listResponse(products, 'Products retrieved successfully'));
-  } catch (error: unknown) {
-    next(error);
-  }
-};
+
 
 /**
  * Get product by ID
@@ -40,26 +30,7 @@ export const getProductById = async (req: Request, res: Response, next: NextFunc
   }
 };
 
-/**
- * Get products by category
- */
-export const getProductsByCategory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const { category } = req.params;
-    
-    // Validate category is one of the allowed values
-    const validCategories = Object.values(ProductCategory);
-    if (!validCategories.includes(category as ProductCategory)) {
-      throw ERRORS.INVALID_PRODUCT_CATEGORY;
-    }
-    
-    const products = await productRepository.findByCategory(category as ProductCategory);
-    
-    res.json(listResponse(products, `${category} products retrieved successfully`));
-  } catch (error: unknown) {
-    next(error);
-  }
-};
+
 
 /**
  * Create a new product
@@ -306,9 +277,9 @@ export const deleteProduct = async (req: Request, res: Response, next: NextFunct
 };
 
 /**
- * Search products with filters
+ * Get all products with optional filters and search
  */
-export const searchProducts = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const getAllProducts = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const {
       search,
@@ -318,8 +289,6 @@ export const searchProducts = async (req: Request, res: Response, next: NextFunc
       source_type,
       formula_id,
       component_id,
-      is_parent,
-      is_component,
       purchase_info_id,
       page,
       limit
@@ -381,14 +350,7 @@ export const searchProducts = async (req: Request, res: Response, next: NextFunc
       parsedFilters.component_id = parsedComponentId;
     }
     
-    // Parse boolean parameters
-    if (is_parent !== undefined) {
-      parsedFilters.is_parent = is_parent === 'true';
-    }
-    
-    if (is_component !== undefined) {
-      parsedFilters.is_component = is_component === 'true';
-    }
+
     
     // Parse purchase_info_id parameter
     if (purchase_info_id !== undefined) {
@@ -420,7 +382,7 @@ export const searchProducts = async (req: Request, res: Response, next: NextFunc
       parsedFilters.limit = parsedLimit;
     }
     
-    const result = await productRepository.searchProducts(parsedFilters);
+    const result = await productRepository.getAllProducts(parsedFilters);
     
     res.json({
       status: 'success',

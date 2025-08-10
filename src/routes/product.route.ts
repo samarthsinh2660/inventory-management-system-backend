@@ -4,9 +4,7 @@ import {
   getProductById,
   createProduct,
   updateProduct,
-  deleteProduct,
-  getProductsByCategory,
-  searchProducts
+  deleteProduct
 } from '../controllers/product.controller.ts';
 import { authenticate, requireMaster } from '../middleware/auth.middleware.ts';
 
@@ -15,13 +13,7 @@ const productRouter = Router();
 // Apply authentication to all product routes
 productRouter.use(authenticate);
 
-// Search products with filters
-productRouter.get('/search', searchProducts);
-
-// Get products by category (raw, semi, finished)
-productRouter.get('/category/:category', getProductsByCategory);
-
-// Get all products
+// Get all products with optional filters and search
 productRouter.get('/', getAllProducts);
 
 // Get product by ID

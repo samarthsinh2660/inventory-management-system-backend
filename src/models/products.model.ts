@@ -64,8 +64,6 @@ export interface ProductSearchParams {
   source_type?: SourceType;
   formula_id?: number;       // Find products with specific formula ID
   component_id?: number;     // Find products that use specific component ID
-  is_parent?: boolean;       // Whether product has any formulas defined
-  is_component?: boolean;    // Whether product is used as a component
   purchase_info_id?: number | null; // Filter by purchase info (supplier) ID
   page?: number;             // Pagination: page number, default 1
   limit?: number;            // Pagination: items per page, default 20
