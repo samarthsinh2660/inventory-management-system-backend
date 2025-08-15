@@ -1,14 +1,21 @@
 import { db } from '../database/db.ts';
+import { Pool } from 'mysql2/promise';
 import { Product, ProductCategory, ProductCreateParams, ProductSearchParams } from '../models/products.model.ts';
 import { ResultSetHeader } from 'mysql2';
 import { ERRORS } from '../utils/error.ts';
 
 export class ProductRepository {
+  
+  // Simple method to get pool from request or default to db
+  private getPool(req?: any): Pool {
+    return req?.factoryPool || db;
+  }
   /**
    * Find a product by its ID
    */
-  async findById(id: number): Promise<Product | null> {
-    const [products] = await db.execute(
+  async findById(id: number, req?: any): Promise<Product | null> {
+    const pool = this.getPool(req);
+    const [products] = await pool.execute(
       `SELECT p.*, s.name as subcategory_name, l.name as location_name, pf.name as product_formula_name,
               pi.business_name as purchase_business_name, pi.address as purchase_address,
               pi.phone_number as purchase_phone, pi.email as purchase_email, pi.gst_number as purchase_gst
@@ -27,8 +34,9 @@ export class ProductRepository {
   /**
    * Find a product by its name
    */
-  async findByName(name: string): Promise<Product | null> {
-    const [products] = await db.execute(
+  async findByName(name: string, req?: any): Promise<Product | null> {
+    const pool = this.getPool(req);
+    const [products] = await pool.execute(
       `SELECT p.*, s.name as subcategory_name, l.name as location_name
        FROM Products p
        JOIN Subcategories s ON p.subcategory_id = s.id
@@ -43,13 +51,13 @@ export class ProductRepository {
   /**
    * Get all products with optional filters
    */
-  async getAllProducts(filters?: ProductSearchParams): Promise<{ products: Product[], total: number }> {
+  async getAllProducts(filters?: ProductSearchParams, req?: any): Promise<{ products: Product[], total: number }> {
     // If no filters provided, use empty filters object
     if (!filters) {
       filters = {};
     }
     
-    return this.searchProducts(filters);
+    return this.searchProducts(filters, req);
   }
 
 
@@ -68,10 +76,11 @@ export class ProductRepository {
     price?: number | null;
     product_formula_id?: number | null;
     purchase_info_id?: number | null;
-  }): Promise<Product> {
+  }, req?: any): Promise<Product> {
     try {
+      const pool = this.getPool(req);
       // Check if product name already exists
-      const [existingProducts] = await db.execute(
+      const [existingProducts] = await pool.execute(
         "SELECT * FROM Products WHERE name = ?",
         [productData.name]
       ) as [any[], any];
@@ -81,7 +90,7 @@ export class ProductRepository {
       }
 
       // Insert the product
-      const [result] = await db.execute(
+      const [result] = await pool.execute(
         `INSERT INTO Products 
          (subcategory_id, name, unit, source_type, category, min_stock_threshold, location_id, price, product_formula_id, purchase_info_id) 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -102,7 +111,7 @@ export class ProductRepository {
       const id = result.insertId;
 
       // Get the product with the location name
-      const [rows] = await db.execute(
+      const [rows] = await pool.execute(
         `SELECT p.*, l.name as location_name, sc.name as subcategory_name
          FROM Products p
          LEFT JOIN Locations l ON p.location_id = l.id
@@ -139,18 +148,20 @@ export class ProductRepository {
       price?: number | null;
       product_formula_id?: number | null;
       purchase_info_id?: number | null;
-    }
+    },
+    req?: any
   ): Promise<Product | null> {
     try {
       // Check if product exists
-      const product = await this.findById(id);
+      const product = await this.findById(id, req);
       if (!product) {
         throw ERRORS.PRODUCT_NOT_FOUND;
       }
 
       // Check if name is being updated and already exists
       if (productData.name && productData.name !== product.name) {
-        const [existingProducts] = await db.execute(
+        const pool = this.getPool(req);
+        const [existingProducts] = await pool.execute(
           "SELECT * FROM Products WHERE name = ? AND id != ?",
           [productData.name, id]
         ) as [any[], any];
@@ -223,13 +234,14 @@ export class ProductRepository {
       updateValues.push(id);
 
       // Execute update
-      await db.execute(
+      const pool = this.getPool(req);
+      await pool.execute(
         `UPDATE Products SET ${updateFields.join(', ')} WHERE id = ?`,
         updateValues
       );
 
       // Get the updated product
-      return await this.findById(id);
+      return await this.findById(id, req);
     } catch (error) {
       console.error('Error updating product:', error);
 
@@ -244,16 +256,17 @@ export class ProductRepository {
   /**
    * Delete a product by ID
    */
-  async delete(id: number): Promise<boolean> {
+  async delete(id: number, req?: any): Promise<boolean> {
     try {
       // Check if product exists
-      const product = await this.findById(id);
+      const product = await this.findById(id, req);
       if (!product) {
         throw ERRORS.PRODUCT_NOT_FOUND;
       }
       
+      const pool = this.getPool(req);
       // Check if product is used in any inventory entries
-      const [inventoryEntries] = await db.execute(
+      const [inventoryEntries] = await pool.execute(
         'SELECT COUNT(*) as count FROM InventoryEntries WHERE product_id = ?',
         [id]
       ) as [any[], any];
@@ -274,7 +287,7 @@ export class ProductRepository {
       }
       
       // Check if product is used as a component in any formula
-      const [formulas] = await db.execute(
+      const [formulas] = await pool.execute(
         'SELECT id, name, components FROM ProductFormula'
       ) as [any[], any];
       
@@ -301,7 +314,7 @@ export class ProductRepository {
       }
       
       // Now it's safe to delete the product
-      const [result] = await db.execute(
+      const [result] = await pool.execute(
         'DELETE FROM Products WHERE id = ?',
         [id]
       ) as [ResultSetHeader, any];
@@ -327,7 +340,7 @@ export class ProductRepository {
   /**
    * Search products with flexible filtering options
    */
-  async searchProducts(filters: ProductSearchParams): Promise<{ products: Product[], total: number }> {
+  async searchProducts(filters: ProductSearchParams, req?: any): Promise<{ products: Product[], total: number }> {
     const {
       search,
       category,
@@ -424,10 +437,11 @@ export class ProductRepository {
 
     try {
       // Execute main query with pagination
-      const [products] = await db.execute(paginatedQuery, params) as [Product[], any];
+      const pool = this.getPool(req);
+      const [products] = await pool.execute(paginatedQuery, params) as [Product[], any];
 
       // Get total count (without parameters)
-      const [countResult] = await db.execute('SELECT FOUND_ROWS() as total') as [any[], any];
+      const [countResult] = await pool.execute('SELECT FOUND_ROWS() as total') as [any[], any];
       const total = countResult[0].total;
 
       return { products, total };

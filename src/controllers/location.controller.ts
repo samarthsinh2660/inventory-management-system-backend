@@ -9,7 +9,7 @@ import { LocationCreateParams, LocationUpdateParams } from '../models/locations.
  */
 export const getAllLocations = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const locations = await locationRepository.getAllLocations();
+    const locations = await locationRepository.getAllLocations(req);
     res.json(listResponse(locations, 'Locations retrieved successfully'));
   } catch (error: unknown) {
     next(error);
@@ -27,7 +27,7 @@ export const getLocationById = async (req: Request, res: Response, next: NextFun
       throw ERRORS.INVALID_PARAMS;
     }
     
-    const location = await locationRepository.findById(locationId);
+    const location = await locationRepository.findById(locationId, req);
     
     if (!location) {
       throw ERRORS.LOCATION_NOT_FOUND;
@@ -52,7 +52,7 @@ export const createLocation = async (req: Request, res: Response, next: NextFunc
     }
     
     // Check for duplicate name
-    const existingLocation = await locationRepository.findByName(name);
+    const existingLocation = await locationRepository.findByName(name, req);
     if (existingLocation) {
       throw ERRORS.DUPLICATE_LOCATION_NAME;
     }
@@ -64,7 +64,7 @@ export const createLocation = async (req: Request, res: Response, next: NextFunc
         factory_id: factory_id === undefined ? 1 : factory_id
       };
       
-      const location = await locationRepository.create(locationData);
+      const location = await locationRepository.create(locationData,req);
       
       res.status(201).json(createdResponse(location, 'Location created successfully'));
     } catch (error: unknown) {
@@ -94,14 +94,14 @@ export const updateLocation = async (req: Request, res: Response, next: NextFunc
     }
     
     // Check if location exists
-    const existingLocation = await locationRepository.findById(locationId);
+    const existingLocation = await locationRepository.findById(locationId, req);
     if (!existingLocation) {
       throw ERRORS.LOCATION_NOT_FOUND;
     }
     
     // Check for duplicate name if name is being changed
     if (name && name !== existingLocation.name) {
-      const duplicateLocation = await locationRepository.findByName(name);
+      const duplicateLocation = await locationRepository.findByName(name, req);
       if (duplicateLocation) {
         throw ERRORS.DUPLICATE_LOCATION_NAME;
       }
@@ -113,7 +113,7 @@ export const updateLocation = async (req: Request, res: Response, next: NextFunc
       if (address !== undefined) locationData.address = address;
       if (factory_id !== undefined) locationData.factory_id = factory_id;
       
-      const updatedLocation = await locationRepository.update(locationId, locationData);
+      const updatedLocation = await locationRepository.update(locationId, locationData, req);
       
       res.json(updatedResponse(updatedLocation, 'Location updated successfully'));
     } catch (error: unknown) {
@@ -136,13 +136,13 @@ export const deleteLocation = async (req: Request, res: Response, next: NextFunc
     }
     
     // Check if location exists
-    const location = await locationRepository.findById(locationId);
+    const location = await locationRepository.findById(locationId, req);
     if (!location) {
       throw ERRORS.LOCATION_NOT_FOUND;
     }
     
     try {
-      await locationRepository.deleteLocation(locationId);
+      await locationRepository.deleteLocation(locationId, req);
       res.json(deletedResponse('Location deleted successfully'));
     } catch (error: unknown) {
       // Check if it's because location is in use

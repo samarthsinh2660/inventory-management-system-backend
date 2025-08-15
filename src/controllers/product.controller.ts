@@ -18,7 +18,7 @@ export const getProductById = async (req: Request, res: Response, next: NextFunc
       throw ERRORS.INVALID_PARAMS;
     }
     
-    const product = await productRepository.findById(productId);
+    const product = await productRepository.findById(productId, req);
     
     if (!product) {
       throw ERRORS.PRODUCT_NOT_FOUND;
@@ -88,14 +88,14 @@ export const createProduct = async (req: Request, res: Response, next: NextFunct
     }
     
     // Check for duplicate name
-    const existingProduct = await productRepository.findByName(name);
+    const existingProduct = await productRepository.findByName(name, req);
     if (existingProduct) {
       throw ERRORS.PRODUCT_NAME_EXISTS;
     }
 
     // If a formula ID is provided (and not 0), verify that the formula exists
     if (product_formula_id && product_formula_id !== 0) {
-      const formula = await productFormulaRepository.findById(Number(product_formula_id));
+      const formula = await productFormulaRepository.findById(Number(product_formula_id), req);
       if (!formula) {
         throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
       }
@@ -118,7 +118,7 @@ export const createProduct = async (req: Request, res: Response, next: NextFunct
         price,
         product_formula_id: (product_formula_id && product_formula_id !== 0) ? Number(product_formula_id) : null,
         purchase_info_id: purchase_info_id ? Number(purchase_info_id) : null
-      });
+      }, req);
       
       res.status(201).json(createdResponse(product, 'Product created successfully'));
     } catch (error: unknown) {
@@ -154,7 +154,7 @@ export const updateProduct = async (req: Request, res: Response, next: NextFunct
     } = req.body;
     
     // Check if product exists
-    const existingProduct = await productRepository.findById(productId);
+    const existingProduct = await productRepository.findById(productId, req);
     if (!existingProduct) {
       throw ERRORS.PRODUCT_NOT_FOUND;
     }
@@ -164,7 +164,7 @@ export const updateProduct = async (req: Request, res: Response, next: NextFunct
     
     // Handle name update and check for duplicates
     if (name !== undefined && name !== existingProduct.name) {
-      const duplicateProduct = await productRepository.findByName(name);
+      const duplicateProduct = await productRepository.findByName(name, req);
       if (duplicateProduct && duplicateProduct.id !== productId) {
         throw ERRORS.PRODUCT_NAME_EXISTS;
       }
@@ -208,7 +208,7 @@ export const updateProduct = async (req: Request, res: Response, next: NextFunct
         updateData.product_formula_id = null;
       } else {
         // Verify the formula exists
-        const formula = await productFormulaRepository.findById(Number(product_formula_id));
+        const formula = await productFormulaRepository.findById(Number(product_formula_id), req);
         if (!formula) {
           throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
         }
@@ -229,7 +229,7 @@ export const updateProduct = async (req: Request, res: Response, next: NextFunct
     }
     
     try {
-      const updatedProduct = await productRepository.update(productId, updateData);
+      const updatedProduct = await productRepository.update(productId, updateData, req);
       
       res.json(updatedResponse(updatedProduct, 'Product updated successfully'));
     } catch (error: unknown) {
@@ -252,13 +252,13 @@ export const deleteProduct = async (req: Request, res: Response, next: NextFunct
     }
     
     // Check if product exists
-    const product = await productRepository.findById(productId);
+    const product = await productRepository.findById(productId, req);
     if (!product) {
       throw ERRORS.PRODUCT_NOT_FOUND;
     }
     
     try {
-      await productRepository.delete(productId);
+      const deleted = await productRepository.delete(productId, req);
       res.json(deletedResponse('Product deleted successfully'));
     } catch (error: unknown) {
       // Pass through known errors directly
@@ -382,7 +382,7 @@ export const getAllProducts = async (req: Request, res: Response, next: NextFunc
       parsedFilters.limit = parsedLimit;
     }
     
-    const result = await productRepository.getAllProducts(parsedFilters);
+    const result = await productRepository.getAllProducts(parsedFilters, req);
     
     res.json({
       status: 'success',

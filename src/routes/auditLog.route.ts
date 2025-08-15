@@ -8,7 +8,6 @@ import {
 } from '../controllers/auditLog.controller.ts';
 import { authenticate, requireMaster } from '../middleware/auth.middleware.ts';
 
-
 const AuditLogRouter = Router();
 
 // Apply authentication middleware to all audit log routes

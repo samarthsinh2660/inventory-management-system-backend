@@ -1,5 +1,6 @@
 import { RowDataPacket } from 'mysql2';
 import { db } from '../database/db.ts';
+import { Pool } from 'mysql2/promise';
 
 export interface Alert extends RowDataPacket {
   id: number;
@@ -29,10 +30,13 @@ export interface AlertFilters {
 }
 
 export class AlertRepository {
+  private getPool(req?: any): Pool {
+    return req?.factoryPool || db;
+  }
   /**
    * Get all alerts with optional filtering and pagination
    */
-  static async getAllAlerts(filters: AlertFilters = {}): Promise<{
+  async getAllAlerts(filters: AlertFilters = {}, req?: any): Promise<{
     alerts: Alert[];
     total: number;
   }> {
@@ -60,7 +64,7 @@ export class AlertRepository {
     // Add pagination
     query += ` LIMIT ${limit} OFFSET ${offset}`;
     
-    const [alerts] = await db.execute<Alert[]>(query, params);
+    const [alerts] = await this.getPool(req).execute<Alert[]>(query, params);
     
     // Get total count for pagination
     let countQuery = `SELECT COUNT(*) as total FROM StockAlerts`;
@@ -68,7 +72,7 @@ export class AlertRepository {
       countQuery += ` WHERE is_resolved = ?`;
     }
     
-    const [countResult] = await db.execute<RowDataPacket[]>(
+    const [countResult] = await this.getPool(req).execute<RowDataPacket[]>(
       countQuery,
       resolved !== null ? [resolved] : []
     );
@@ -81,8 +85,8 @@ export class AlertRepository {
   /**
    * Mark an alert as resolved
    */
-  static async resolveAlert(alertId: number): Promise<number> {
-    const [result] = await db.execute<RowDataPacket[]>(
+  async resolveAlert(alertId: number, req?: any): Promise<number> {
+    const [result] = await this.getPool(req).execute<RowDataPacket[]>(
       'UPDATE StockAlerts SET is_resolved = true, resolved_at = CURRENT_TIMESTAMP WHERE id = ?',
       [alertId]
     );
@@ -93,8 +97,8 @@ export class AlertRepository {
   /**
    * Mark all notifications related to an alert as read
    */
-  static async markAlertNotificationsAsRead(alertId: number): Promise<void> {
-    await db.execute(
+  async markAlertNotificationsAsRead(alertId: number, req?: any): Promise<void> {
+    await this.getPool(req).execute(
       'UPDATE Notifications SET is_read = true WHERE stock_alert_id = ?',
       [alertId]
     );
@@ -103,8 +107,8 @@ export class AlertRepository {
   /**
    * Get all unread notifications
    */
-  static async getUnreadNotifications(): Promise<Notification[]> {
-    const [notifications] = await db.execute<Notification[]>(`
+  async getUnreadNotifications(req?: any): Promise<Notification[]> {
+    const [notifications] = await this.getPool(req).execute<Notification[]>(`
       SELECT n.*, p.name AS product_name, p.id AS product_id, l.name AS location_name
       FROM Notifications n
       JOIN Products p ON n.product_id = p.id
@@ -119,8 +123,8 @@ export class AlertRepository {
   /**
    * Get a notification by ID
    */
-  static async getNotificationById(notificationId: number): Promise<Notification | null> {
-    const [notification] = await db.execute<Notification[]>(
+  async getNotificationById(notificationId: number, req?: any): Promise<Notification | null> {
+    const [notification] = await this.getPool(req).execute<Notification[]>(
       'SELECT * FROM Notifications WHERE id = ?',
       [notificationId]
     );
@@ -131,8 +135,8 @@ export class AlertRepository {
   /**
    * Mark a notification as read
    */
-  static async markNotificationAsRead(notificationId: number): Promise<void> {
-    await db.execute(
+  async markNotificationAsRead(notificationId: number, req?: any): Promise<void> {
+    await this.getPool(req).execute(
       'UPDATE Notifications SET is_read = true WHERE id = ?',
       [notificationId]
     );

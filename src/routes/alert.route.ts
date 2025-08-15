@@ -9,7 +9,7 @@ import { authenticate, requireMaster } from '../middleware/auth.middleware.ts';
 
 const AlertRouter = Router();
 
-// All routes require authentication
+// Apply authentication to all alert routes
 AlertRouter.use(authenticate);
 
 // Get all products below threshold - available to all authenticated users

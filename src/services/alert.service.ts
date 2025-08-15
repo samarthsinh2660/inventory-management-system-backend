@@ -1,5 +1,4 @@
-import { db } from '../database/db.ts';
-import { RowDataPacket } from 'mysql2';
+import { RowDataPacket, Pool } from 'mysql2/promise';
 import { User } from '../models/users.model.ts';
 
 // Interface for low stock products
@@ -23,7 +22,7 @@ class AlertService {
   /**
    * Find all products that are below their minimum stock threshold
    */
-  async getProductsBelowThreshold(): Promise<LowStockProduct[]> {
+  async getProductsBelowThreshold(tenantPool: Pool): Promise<LowStockProduct[]> {
     try {
       // Get current stock levels and join with product info
       const query = `
@@ -55,7 +54,7 @@ class AlertService {
           (current_stock / p.min_stock_threshold) ASC;
       `;
       
-      const [products] = await db.execute<RowDataPacket[]>(query);
+      const [products] = await tenantPool.execute<RowDataPacket[]>(query);
       return products as LowStockProduct[];
     } catch (error) {
       console.error("Error getting products below threshold:", error);
@@ -66,9 +65,9 @@ class AlertService {
   /**
    * Get all master users who should receive notifications
    */
-  async getMasterUsers(): Promise<User[]> {
+  async getMasterUsers(tenantPool: Pool): Promise<User[]> {
     try {
-      const [users] = await db.execute<RowDataPacket[]>(
+      const [users] = await tenantPool.execute<RowDataPacket[]>(
         'SELECT id, username, email FROM Users WHERE role = ?', 
         ['master']
       );
@@ -84,18 +83,18 @@ class AlertService {
    * Also resolve alerts and notifications for products that are now above threshold
    * This is the main method to be called after inventory changes
    */
-  async checkAndSendAlerts(): Promise<void> {
+  async checkAndSendAlerts(tenantPool: Pool): Promise<void> {
     try {
-      const lowStockProducts = await this.getProductsBelowThreshold();
+      const lowStockProducts = await this.getProductsBelowThreshold(tenantPool);
       
       // Resolve alerts and notifications for products that are now above threshold
-      await this.resolveRefilledAlerts(lowStockProducts);
+      await this.resolveRefilledAlerts(tenantPool, lowStockProducts);
       
       if (lowStockProducts.length === 0) {
         return; // No new alerts needed
       }
       
-      const masterUsers = await this.getMasterUsers();
+      const masterUsers = await this.getMasterUsers(tenantPool);
       
       if (masterUsers.length === 0) {
         console.warn("No master users found to notify about low stock");
@@ -109,32 +108,32 @@ class AlertService {
       });
       
       // Store alerts in the database for later retrieval via API
-      await this.storeAlerts(lowStockProducts);
+      await this.storeAlerts(lowStockProducts, tenantPool);
       
       // Create in-app notifications for each master user for dashboard display
-      await this.createInAppNotifications(lowStockProducts, masterUsers);
+      await this.createInAppNotifications(lowStockProducts, masterUsers, tenantPool);
       
     } catch (error) {
       console.error("Error in checking and sending alerts:", error);
     }
   }
-  
+
   /**
    * Store alerts in the database for retrieval via API
    */
-  private async storeAlerts(products: LowStockProduct[]): Promise<void> {
+  private async storeAlerts(products: LowStockProduct[], tenantPool: Pool): Promise<void> {
     try {
       // Insert new alerts, avoiding duplicates
       for (const product of products) {
         // Check if there's already an unresolved alert for this product
-        const [existingAlerts] = await db.execute<RowDataPacket[]>(
+        const [existingAlerts] = await tenantPool.execute<RowDataPacket[]>(
           'SELECT id FROM StockAlerts WHERE product_id = ? AND is_resolved = false',
           [product.id]
         );
         
         // If no existing unresolved alert, create one
         if (existingAlerts.length === 0) {
-          await db.execute(
+          await tenantPool.execute(
             `INSERT INTO StockAlerts (
               product_id, current_stock, min_threshold
             ) VALUES (?, ?, ?)`,
@@ -146,7 +145,7 @@ class AlertService {
           );
         } else {
           // Update existing alert with current stock level
-          await db.execute(
+          await tenantPool.execute(
             'UPDATE StockAlerts SET current_stock = ? WHERE id = ?',
             [product.current_stock, existingAlerts[0].id]
           );
@@ -162,13 +161,14 @@ class AlertService {
    */
   private async createInAppNotifications(
     products: LowStockProduct[],
-    masterUsers: User[]
+    masterUsers: User[],
+    tenantPool: Pool
   ): Promise<void> {
     try {
       // For each product, create or update notification
       for (const product of products) {
         // First check if we already have unread notifications for this product
-        const [existingNotifications] = await db.execute<RowDataPacket[]>(
+        const [existingNotifications] = await tenantPool.execute<RowDataPacket[]>(
           `SELECT id, current_stock FROM Notifications 
            WHERE product_id = ? AND is_read = false`,
           [product.id]
@@ -183,7 +183,7 @@ class AlertService {
           
           // Only update if the stock level has changed
           if (existingNotification.current_stock !== product.current_stock) {
-            await db.execute(
+            await tenantPool.execute(
               `UPDATE Notifications 
                SET current_stock = ?, message = ? 
                WHERE id = ?`,
@@ -197,14 +197,14 @@ class AlertService {
         } else {
           // Create new notification if none exists
           // First get the corresponding stock alert if available
-          const [stockAlerts] = await db.execute<RowDataPacket[]>(
+          const [stockAlerts] = await tenantPool.execute<RowDataPacket[]>(
             'SELECT id FROM StockAlerts WHERE product_id = ? AND is_resolved = false',
             [product.id]
           );
           
           const stock_alert_id = stockAlerts.length > 0 ? stockAlerts[0].id : null;
           
-          await db.execute(
+          await tenantPool.execute(
             `INSERT INTO Notifications (
               product_id, stock_alert_id, message, current_stock, min_threshold
             ) VALUES (?, ?, ?, ?, ?)`,
@@ -226,10 +226,10 @@ class AlertService {
   /**
    * Resolve alerts and notifications for products that are now above their threshold
    */
-  private async resolveRefilledAlerts(currentLowStockProducts: LowStockProduct[]): Promise<void> {
+  private async resolveRefilledAlerts(tenantPool: Pool, currentLowStockProducts: LowStockProduct[]): Promise<void> {
     try {
       // Get all currently unresolved alerts
-      const [unresolvedAlerts] = await db.execute<RowDataPacket[]>(
+      const [unresolvedAlerts] = await tenantPool.execute<RowDataPacket[]>(
         'SELECT product_id FROM StockAlerts WHERE is_resolved = false'
       );
       
@@ -244,7 +244,7 @@ class AlertService {
         
         // Resolve stock alerts for these products
         for (const productId of productsToResolve) {
-          await db.execute(
+          await tenantPool.execute(
             'UPDATE StockAlerts SET is_resolved = true, resolved_at = NOW() WHERE product_id = ? AND is_resolved = false',
             [productId]
           );
@@ -252,7 +252,7 @@ class AlertService {
         
         // Mark notifications as read for these products
         for (const productId of productsToResolve) {
-          await db.execute(
+          await tenantPool.execute(
             'UPDATE Notifications SET is_read = true WHERE product_id = ? AND is_read = false',
             [productId]
           );
@@ -260,7 +260,7 @@ class AlertService {
         
         // Log which products were resolved
         for (const productId of productsToResolve) {
-          const [productInfo] = await db.execute<RowDataPacket[]>(
+          const [productInfo] = await tenantPool.execute<RowDataPacket[]>(
             'SELECT name FROM Products WHERE id = ?',
             [productId]
           );
@@ -273,6 +273,7 @@ class AlertService {
       console.error("Error resolving refilled alerts:", error);
     }
   }
+
 }
 
 export default new AlertService();

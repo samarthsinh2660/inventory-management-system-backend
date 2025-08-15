@@ -206,7 +206,7 @@ export const getAllEntries = async (req: Request, res: Response): Promise<void> 
     }
     
     // Get filtered entries
-    const result = await inventoryEntryRepository.findAllWithFilters(filters);
+    const result = await inventoryEntryRepository.findAllWithFilters(filters, req);
     
     const page = filters.page || 1;
     const limit = filters.limit || 100;
@@ -252,7 +252,7 @@ export const getEntryById = async (req: Request, res: Response): Promise<void> =
       return;
     }
     
-    const entry = await inventoryEntryRepository.findById(entryId);
+    const entry = await inventoryEntryRepository.findById(entryId, req);
     
     if (!entry) {
       res.status(404).json({
@@ -302,7 +302,8 @@ export const getProductEntries = async (req: Request, res: Response): Promise<vo
     const { entries, total } = await inventoryEntryRepository.findByProduct(
       productId, 
       page, 
-      limit
+      limit,
+      req
     );
     
     res.json(responseWithMeta(
@@ -401,11 +402,11 @@ export const createEntry = async (req: Request , res: Response): Promise<void> =
     // Special handling for manufacturing products with formulas
     if (entry_type === 'manufacturing_in') {
       // Get the product to check if it has a formula
-      const product = await productRepository.findById(Number(product_id));
+      const product = await productRepository.findById(Number(product_id),req);
       
       if (product && product.product_formula_id) {
         // Get the formula with its components
-        const formula = await productFormulaRepository.findById(product.product_formula_id);
+        const formula = await productFormulaRepository.findById(product.product_formula_id,req);
         
         if (formula && formula.components && formula.components.length > 0) {
           // Start a transaction to handle the parent product addition and component deductions
@@ -420,7 +421,8 @@ export const createEntry = async (req: Request , res: Response): Promise<void> =
               reference_id
             },
             formula.components,
-            Number(quantity)
+            Number(quantity),
+            req 
           );
           
           // Create audit logs for the main product and all component entries
@@ -429,20 +431,22 @@ export const createEntry = async (req: Request , res: Response): Promise<void> =
               entryResult.mainEntry.id,
               entryResult.mainEntry,
               req.user?.id || 0, // Use 0 as fallback for system-generated entries
-              req.body.reason
+              req.body.reason,
+              req
             ),
             ...entryResult.componentEntries.map(entry => 
               auditLogRepository.logCreate(
                 entry.id,
                 entry,
                 req.user?.id || 0, // Use 0 as fallback for system-generated entries
-                `Auto-deducted component for manufacturing product ID ${product_id}`
+                `Auto-deducted component for manufacturing product ID ${product_id}`,
+                req
               )
             )
           ]);
           
           // Check for stock threshold alerts after creating entries
-          await alertService.checkAndSendAlerts();
+          await alertService.checkAndSendAlerts((req as any).factoryPool);
           
           res.status(201).json(createdResponse({
             mainEntry: entryResult.mainEntry,
@@ -462,18 +466,19 @@ export const createEntry = async (req: Request , res: Response): Promise<void> =
       location_id: Number(location_id),
       notes,
       reference_id
-    });
+    }, req);
     
     // Create audit log for this operation
     await auditLogRepository.logCreate(
       entry.id,
       entry,
       req.user?.id || 0, // Use 0 as fallback for system-generated entries
-      req.body.reason
+      req.body.reason,
+      req
     );
     
     // Check for stock threshold alerts after creating entry
-    await alertService.checkAndSendAlerts();
+    await alertService.checkAndSendAlerts((req as any).factoryPool);
     
     res.status(201).json(createdResponse(entry, 'Inventory entry created successfully'));
   } catch (error) {
@@ -507,7 +512,7 @@ export const updateEntry = async (req: Request, res: Response): Promise<void> =>
     }
     
     // Check if the entry exists
-    const existingEntry = await inventoryEntryRepository.findById(entryId);
+    const existingEntry = await inventoryEntryRepository.findById(entryId, req);
     if (!existingEntry) {
       res.status(404).json({
         success: false,
@@ -550,7 +555,7 @@ export const updateEntry = async (req: Request, res: Response): Promise<void> =>
     }
     
     // Update the entry
-    const updatedEntry = await inventoryEntryRepository.update(entryId, updateData);
+    const updatedEntry = await inventoryEntryRepository.update(entryId, updateData, req);
     
     // Create audit log for this operation
     await auditLogRepository.logUpdate(
@@ -558,11 +563,12 @@ export const updateEntry = async (req: Request, res: Response): Promise<void> =>
       existingEntry,
       updatedEntry,
       req.user?.id || 0, // Use 0 as fallback for system-generated entries
-      req.body.reason
+      req.body.reason,
+      req
     );
     
     // Check for stock threshold alerts after updating entry
-    await alertService.checkAndSendAlerts();
+    await alertService.checkAndSendAlerts((req as any).factoryPool);
     
     res.json(successResponse(updatedEntry, 'Inventory entry updated successfully'));
   } catch (error) {
@@ -598,7 +604,7 @@ export const deleteEntry = async (req: Request , res: Response): Promise<void> =
     }
     
     // Get the entry before deletion for audit log
-    const entry = await inventoryEntryRepository.findById(entryId);
+    const entry = await inventoryEntryRepository.findById(entryId, req);
     
     if (!entry) {
       res.status(404).json({
@@ -638,18 +644,19 @@ export const deleteEntry = async (req: Request , res: Response): Promise<void> =
     }
     
     // Delete the entry
-    await inventoryEntryRepository.delete(entryId);
+    await inventoryEntryRepository.delete(entryId, req);
     
     // Create audit log for this operation
     await auditLogRepository.logDelete(
       entryId,
       entry,
       req.user?.id || 0, // Use 0 as fallback for system-generated entries
-      req.body.reason
+      req.body.reason,
+      req
     );
     
     // Check for stock threshold alerts after deleting entry
-    await alertService.checkAndSendAlerts();
+    await alertService.checkAndSendAlerts((req as any).factoryPool);
     
     res.json(deletedResponse('Inventory entry deleted successfully'));
   } catch (error) {
@@ -673,7 +680,7 @@ export const getBalance = async (req: Request, res: Response): Promise<void> => 
       ? parseInt(req.query.location_id as string) 
       : undefined;
     
-    const balance = await inventoryEntryRepository.getBalance(locationId);
+    const balance = await inventoryEntryRepository.getBalance(locationId, req);
     
     res.json(successResponse(balance, 'Inventory balance retrieved successfully'));
   } catch (error) {
@@ -713,7 +720,8 @@ export const getUserInventoryEntries = async (req: Request, res: Response): Prom
     const { username, entries, total } = await inventoryEntryRepository.getUserInventoryEntries(
       userId, 
       page, 
-      limit
+      limit,
+      req
     );
     
     res.json(responseWithMeta(

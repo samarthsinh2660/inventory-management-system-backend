@@ -18,9 +18,9 @@ export const getAllSubcategories = async (req: Request, res: Response, next: Nex
       if (!['raw', 'semi', 'finished'].includes(category as string)) {
         throw ERRORS.VALIDATION_ERROR;
       }
-      subcategories = await subcategoryRepository.getSubcategoriesByCategory(category as string);
+      subcategories = await subcategoryRepository.getSubcategoriesByCategory(category as string, req);
     } else {
-      subcategories = await subcategoryRepository.getAllSubcategories();
+      subcategories = await subcategoryRepository.getAllSubcategories(req);
     }
     
     const message = category 
@@ -44,7 +44,7 @@ export const getSubcategoryById = async (req: Request, res: Response, next: Next
       throw ERRORS.INVALID_PARAMS;
     }
     
-    const subcategory = await subcategoryRepository.findById(subcategoryId);
+    const subcategory = await subcategoryRepository.findById(subcategoryId, req);
     
     if (!subcategory) {
       throw ERRORS.SUBCATEGORY_NOT_FOUND;
@@ -77,7 +77,7 @@ export const createSubcategory = async (req: Request, res: Response, next: NextF
     }
     
     // Check for duplicate name
-    const existingSubcategory = await subcategoryRepository.findByName(name);
+    const existingSubcategory = await subcategoryRepository.findByName(name, req);
     if (existingSubcategory) {
       throw ERRORS.DUPLICATE_SUBCATEGORY_NAME;
     }
@@ -88,7 +88,7 @@ export const createSubcategory = async (req: Request, res: Response, next: NextF
         name,
         description 
       };
-      const subcategory = await subcategoryRepository.create(subcategoryData);
+      const subcategory = await subcategoryRepository.create(subcategoryData, req);
       
       res.status(201).json(createdResponse(subcategory, 'Subcategory created successfully'));
     } catch (error: unknown) {
@@ -123,14 +123,14 @@ export const updateSubcategory = async (req: Request, res: Response, next: NextF
     }
     
     // Check if subcategory exists
-    const existingSubcategory = await subcategoryRepository.findById(subcategoryId);
+    const existingSubcategory = await subcategoryRepository.findById(subcategoryId, req);
     if (!existingSubcategory) {
       throw ERRORS.SUBCATEGORY_NOT_FOUND;
     }
     
     // Check for duplicate name if name is being changed
     if (name && name !== existingSubcategory.name) {
-      const duplicateSubcategory = await subcategoryRepository.findByName(name);
+      const duplicateSubcategory = await subcategoryRepository.findByName(name, req);
       if (duplicateSubcategory) {
         throw ERRORS.DUPLICATE_SUBCATEGORY_NAME;
       }
@@ -142,7 +142,7 @@ export const updateSubcategory = async (req: Request, res: Response, next: NextF
       if (name !== undefined) subcategoryData.name = name;
       if (description !== undefined) subcategoryData.description = description;
       
-      const updatedSubcategory = await subcategoryRepository.update(subcategoryId, subcategoryData);
+      const updatedSubcategory = await subcategoryRepository.update(subcategoryId, subcategoryData, req);
       
       res.json(updatedResponse(updatedSubcategory, 'Subcategory updated successfully'));
     } catch (error: unknown) {
@@ -165,13 +165,13 @@ export const deleteSubcategory = async (req: Request, res: Response, next: NextF
     }
     
     // Check if subcategory exists
-    const subcategory = await subcategoryRepository.findById(subcategoryId);
+    const subcategory = await subcategoryRepository.findById(subcategoryId, req);
     if (!subcategory) {
       throw ERRORS.SUBCATEGORY_NOT_FOUND;
     }
     
     try {
-      await subcategoryRepository.deleteSubcategory(subcategoryId);
+      await subcategoryRepository.deleteSubcategory(subcategoryId, req);
       
       res.json(deletedResponse('Subcategory deleted successfully'));
     } catch (error: unknown) {

@@ -12,7 +12,7 @@ export const getAllUsers = async (req: Request, res: Response, next: NextFunctio
     try {
         // Authorization check is done in middleware
         
-        const users = await userRepository.getAllUsers();
+        const users = await userRepository.getAllUsers(req);
         res.json(successResponse(users, 'Users retrieved successfully'));
     } catch (error) {
         next(error);
@@ -32,7 +32,7 @@ export const createUser = async (req: Request, res: Response, next: NextFunction
         }
         
         // Check if username already exists
-        const existingUser = await userRepository.findByUsername(username);
+        const existingUser = await userRepository.findByUsername(username, req);
         if (existingUser) {
             throw ERRORS.RESOURCE_ALREADY_EXISTS;
         }
@@ -48,7 +48,7 @@ export const createUser = async (req: Request, res: Response, next: NextFunction
             email,
             password: hashedPassword,
             role
-        });
+        }, req);
         
         const { password: _, ...userWithoutPassword } = user;
         
@@ -79,13 +79,13 @@ export const deleteUser = async (req: Request, res: Response, next: NextFunction
         }
         
         // Check if user exists
-        const user = await userRepository.findById(userId);
+        const user = await userRepository.findById(userId, req);
         if (!user) {
             throw ERRORS.RESOURCE_NOT_FOUND;
         }
         
         // Delete user
-        await userRepository.deleteUser(userId);
+        await userRepository.deleteUser(userId, req);
         
         res.json(successResponse(null, 'User deleted successfully'));
     } catch (error) {
@@ -107,7 +107,7 @@ export const updateUser = async (req: Request, res: Response, next: NextFunction
         }
         
         // Check if user exists
-        const user = await userRepository.findById(userId);
+        const user = await userRepository.findById(userId, req);
         if (!user) {
             throw ERRORS.RESOURCE_NOT_FOUND;
         }
@@ -131,7 +131,7 @@ export const updateUser = async (req: Request, res: Response, next: NextFunction
 
         // Check for username uniqueness if updating username
         if (username) {
-            const existingUser = await userRepository.findByUsername(username);
+            const existingUser = await userRepository.findByUsername(username, req);
             if (existingUser && existingUser.id !== userId) {
                 throw ERRORS.RESOURCE_ALREADY_EXISTS;
             }
@@ -152,7 +152,7 @@ export const updateUser = async (req: Request, res: Response, next: NextFunction
         }
         
         // Update user
-        const updatedUser = await userRepository.updateUserInfo(userId, updateData);
+        const updatedUser = await userRepository.updateUserInfo(userId, updateData, req);
         
         res.json(successResponse(updatedUser, 'User updated successfully'));
     } catch (error) {

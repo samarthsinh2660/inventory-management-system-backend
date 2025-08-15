@@ -1,1156 +1,236 @@
-# Inventory Management System API
-
-## Overview
+# Multi‑Tenant Inventory Management Backend (Final README)
 
-This API provides a comprehensive inventory management system with audit logging capabilities. It allows tracking of inventory movements, products, locations, subcategories, and product formulas with full authentication support and role-based access control.
+This repository contains a production‑ready, multi‑tenant SaaS backend for an inventory management platform built with Node.js, TypeScript, Express, and MySQL. It supports strict tenant isolation (one database per factory), dynamic connection pooling, unified multi‑tenant authentication, and automated backups.
 
-### ✨ Recent Improvements
+---
 
-- **🛡️ Crash-Resistant Architecture**: Automatic crash detection, logging, and recovery system
-- **📊 Enhanced Data Management**: Improved location and subcategory management with additional fields
-- **🔔 Advanced Alert System**: Comprehensive stock threshold monitoring and notifications
-- **🔧 Production-Ready Stability**: Global error handling ensures zero downtime from unexpected errors
-- **📝 Comprehensive Audit Trail**: Enhanced logging and tracking across all operations
+## Architecture Overview
 
-## Table of Contents
+- Central database (`central_db`) stores factory metadata and connection info only.
+- Each factory has its own isolated MySQL database (full schema per tenant).
+- Usernames use `username@factory_db` format to determine tenant routing.
+- A per‑tenant connection pool is created/reused on demand and cached in memory.
+- JWT embeds `factory_db` and role; all repositories use the per‑request tenant pool.
 
-- [Setup and Installation](#setup-and-installation)
-- [Authentication](#authentication)
-- [API Routes](#api-routes)
-  - [Auth Routes](#auth-routes)
-  - [Inventory Entry Routes](#inventory-entry-routes)
-  - [Audit Log Routes](#audit-log-routes)
-  - [Product Routes](#product-routes)
-  - [Location Routes](#location-routes)
-  - [Subcategory Routes](#subcategory-routes)
-  - [Product Formula Routes](#product-formula-routes)
-- [Customization Options](#customization-options)
-  - [Error Handling](#error-handling)
-  - [Crash Recovery System](#crash-recovery-system)
-  - [Database Schema](#database-schema)
-  - [Stock Alert System](#stock-alert-system)
+Key benefits:
+- Strong data isolation. No cross‑factory queries.
+- Scales to many tenants; add tenants without impacting others.
+- Resilient with connection health checks and automated backups.
 
-## Setup and Installation
+---
 
-### Prerequisites
+## Key Features
 
-- Node.js (v14+)
-- MySQL (v8+)
+- Multi-tenant isolation (one DB per factory) with dynamic, cached pools
+- Unified auth using `username@factory_db` with role-based access (master/employee)
+- Comprehensive modules: products, inventory, formulas (JSON BOM), audit logs, suppliers, locations, subcategories
+- Advanced filtering for inventory and audit logs
+- Stock threshold alerts and in-app notifications for masters
+- Automated backups with retention and cleanup
+- Crash recovery with automatic restart and detailed logging
 
-### Using Docker
+## Quick Start
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/inventory-management-system.git
-   cd inventory-management-system
-   ```
-
-2. Start with Docker Compose:
-   ```bash
-   docker-compose up -d
-   ```
-
-   This will:
-   - Start a MySQL database with pre-configured schema and health checks
-   - Start the Node.js backend API on port 3000 with automatic restart on crashes
-   - Enable the crash recovery system for maximum uptime
-   - Set up proper logging and error handling for production use
-
-### Manual Setup
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/inventory-management-system.git
-   cd inventory-management-system
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Set up environment variables:
-   ```bash
-   cp .env.example .env
-   # Edit the .env file with your database credentials
-   ```
-
-4. Run database migrations:
-   ```bash
-   npm run migrate
-   ```
-
-5. Start the server:
-   ```bash
-   npm start
-   ```
-
-## Authentication
-
-The API uses JWT authentication with role-based access control. Two roles are supported:
-
-- **Employee**: Basic access to view data and create entries
-- **Master**: Full access to all features including updates, deletions, and reversions
-
-### Token Format
-
-JWT tokens contain:
-- `id`: User ID
-- `username`: Username
-- `is_master`: Boolean indicating master privileges
-
-## API Routes
-
-### Auth Routes
-
-#### Register a new user
-
-```
-POST /api/auth/register
-```
-
-Request body:
-```json
-{
-  "username": "john",
-  "password": "password123",
-  "is_master": false
-}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "username": "john",
-    "is_master": false
-  }
-}
-```
-
-#### Login
-
-```
-POST /api/auth/login
-```
-
-Request body:
-```json
-{
-  "username": "john",
-  "password": "password123"
-}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": 1,
-    "username": "john",
-    "is_master": false
-  }
-}
-```
-
-### Inventory Entry Routes
-
-All routes require authentication.
-
-#### Get inventory balance
-
-```
-GET /api/inventory/balance
-```
-
-Query parameters:
-- `location_id` (optional): Filter by location ID
-
-Response:
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "product_id": 1,
-      "product_name": "Product A",
-      "location_id": 1,
-      "location_name": "Warehouse 1",
-      "balance": 150.00
-    }
-  ]
-}
-```
-
-#### Get all inventory entries
-
-```
-GET /api/inventory
-```
-
-Query parameters:
-- `page` (default: 1): Page number
-- `limit` (default: 10): Items per page
-- `product_id` (optional): Filter by product
-- `location_id` (optional): Filter by location
-- `entry_type` (optional): Filter by entry type ('in' or 'out')
-- `start_date` (optional): Filter by date range start
-- `end_date` (optional): Filter by date range end
-
-Response:
-```json
-{
-  "success": true,
-  "data": [...],
-  "total": 50,
-  "page": 1,
-  "limit": 10
-}
-```
-
-#### Get entry by ID
-
-```
-GET /api/inventory/:id
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "product_id": 1,
-    "product_name": "Product A",
-    "quantity": 10.00,
-    "entry_type": "in",
-    "location_id": 1,
-    "location_name": "Warehouse 1",
-    "user_id": 1,
-    "username": "john",
-    "created_at": "2025-06-26T10:00:00.000Z",
-    "updated_at": "2025-06-26T10:00:00.000Z",
-    "notes": "Initial stock",
-    "reference_id": null,
-    "reference_type": null
-  }
-}
-```
-
-#### Get entries for a specific product
-
-```
-GET /api/inventory/product/:productId
-```
-
-Query parameters:
-- `page` (default: 1): Page number
-- `limit` (default: 10): Items per page
-
-Response: Same format as GET /api/inventory
-
-#### Create inventory entry
-
-```
-POST /api/inventory
-```
-
-Request body:
-```json
-{
-  "product_id": 1,
-  "quantity": 10.00,
-  "entry_type": "in",
-  "location_id": 1,
-  "notes": "Restock",
-  "reference_id": null,
-  "reference_type": null
-}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "product_id": 1,
-    "quantity": 10.00,
-    "entry_type": "in",
-    "location_id": 1,
-    "user_id": 1,
-    "created_at": "2025-06-26T10:00:00.000Z",
-    "updated_at": "2025-06-26T10:00:00.000Z",
-    "notes": "Restock",
-    "reference_id": null,
-    "reference_type": null
-  }
-}
-```
-
-#### Update inventory entry (Master only)
-
-```
-PUT /api/inventory/:id
-```
-
-Request body:
-```json
-{
-  "quantity": 15.00,
-  "notes": "Updated quantity"
-}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "quantity": 15.00,
-    "notes": "Updated quantity",
-    "updated_at": "2025-06-26T11:00:00.000Z",
-    // ... other fields
-  }
-}
-```
-
-#### Delete inventory entry (Master only)
-
-```
-DELETE /api/inventory/:id
-```
-
-Response:
-```json
-{
-  "success": true,
-  "message": "Inventory entry deleted successfully"
-}
-```
-
-### Audit Log Routes
-
-All routes require authentication.
-
-#### Get all audit logs
-
-```
-GET /api/audit-logs
-```
-
-Query parameters:
-- `page` (default: 1): Page number
-- `limit` (default: 10): Items per page
-- `entry_id` (optional): Filter by entry ID
-- `action` (optional): Filter by action ('create', 'update', 'delete')
-- `user_id` (optional): Filter by user ID
-- `start_date` (optional): Filter by date range start
-- `end_date` (optional): Filter by date range end
-
-Response:
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "entry_id": 1,
-      "action": "create",
-      "user_id": 1,
-      "username": "john",
-      "old_data": null,
-      "new_data": {...},
-      "created_at": "2025-06-26T10:00:00.000Z",
-      "reason": null
-    }
-  ],
-  "total": 50,
-  "page": 1,
-  "limit": 10
-}
-```
-
-#### Get audit log by ID
-
-```
-GET /api/audit-logs/:id
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "entry_id": 1,
-    "action": "create",
-    "user_id": 1,
-    "username": "john",
-    "old_data": null,
-    "new_data": {...},
-    "created_at": "2025-06-26T10:00:00.000Z",
-    "reason": null
-  }
-}
-```
-
-#### Get audit logs by entry ID
-
-```
-GET /api/audit-logs/entry/:entryId
-```
-
-Query parameters:
-- `page` (default: 1): Page number
-- `limit` (default: 10): Items per page
-
-Response: Same format as GET /api/audit-logs
-
-#### Get audit logs by record type
-
-```
-GET /api/audit-logs/record-type/:recordType
-```
-
-Query parameters:
-- `page` (default: 1): Page number
-- `limit` (default: 10): Items per page
-
-Response: Same format as GET /api/audit-logs
-
-#### Delete audit log (Master only)
-
-```
-DELETE /api/audit-logs/:id
-```
-
-Query parameters:
-- `revert` (default: false): Whether to revert the changes
-
-Response:
-```json
-{
-  "success": true,
-  "message": "Audit log deleted successfully"
-}
-```
-
-### Product Routes
-
-All routes require authentication.
-
-#### Get all products
-
-```
-GET /api/products
-```
-
-Query parameters:
-- `page` (default: 1): Page number
-- `limit` (default: 10): Items per page
-- `subcategory_id` (optional): Filter by subcategory
-
-Response:
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "name": "Product A",
-      "description": "Description of Product A",
-      "subcategory_id": 1,
-      "subcategory_name": "Subcategory 1",
-      "created_at": "2025-06-26T10:00:00.000Z",
-      "updated_at": "2025-06-26T10:00:00.000Z"
-    }
-  ],
-  "total": 50,
-  "page": 1,
-  "limit": 10
-}
-```
-
-#### Get product by ID
-
-```
-GET /api/products/:id
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "name": "Product A",
-    "description": "Description of Product A",
-    "subcategory_id": 1,
-    "subcategory_name": "Subcategory 1",
-    "created_at": "2025-06-26T10:00:00.000Z",
-    "updated_at": "2025-06-26T10:00:00.000Z"
-  }
-}
-```
-
-#### Create product (Master only)
-
-```
-POST /api/products
-```
-
-Request body:
-```json
-{
-  "name": "Product A",
-  "description": "Description of Product A",
-  "subcategory_id": 1
-}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "name": "Product A",
-    "description": "Description of Product A",
-    "subcategory_id": 1,
-    "created_at": "2025-06-26T10:00:00.000Z",
-    "updated_at": "2025-06-26T10:00:00.000Z"
-  }
-}
-```
-
-#### Update product (Master only)
-
-```
-PUT /api/products/:id
-```
-
-Request body:
-```json
-{
-  "name": "Updated Product A",
-  "description": "Updated description"
-}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "name": "Updated Product A",
-    "description": "Updated description",
-    "subcategory_id": 1,
-    "updated_at": "2025-06-26T11:00:00.000Z",
-    // ... other fields
-  }
-}
-```
-
-#### Delete product (Master only)
-
-```
-DELETE /api/products/:id
-```
-
-Response:
-```json
-{
-  "success": true,
-  "message": "Product deleted successfully"
-}
-```
-
-### Location Routes
-
-All routes require authentication.
-
-> **Enhanced Features**: Location management has been improved with additional validation, better error handling, and enhanced data fields for more comprehensive warehouse management.
-
-#### Get all locations
-
-```
-GET /api/locations
-```
-
-Query parameters:
-- `page` (default: 1): Page number
-- `limit` (default: 10): Items per page
-
-Response:
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "name": "Warehouse 1",
-      "address": "123 Main St"
-    }
-  ],
-  "total": 10,
-  "page": 1,
-  "limit": 10
-}
-```
-
-#### Get location by ID
-
-```
-GET /api/locations/:id
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "name": "Warehouse 1",
-    "address": "123 Main St"
-  }
-}
-```
-
-#### Create location (Master only)
-
-```
-POST /api/locations
-```
-
-Request body:
-```json
-{
-  "name": "Warehouse 2",
-  "address": "456 Second Ave"
-}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 2,
-    "name": "Warehouse 2",
-    "address": "456 Second Ave"
-  }
-}
-```
-
-#### Update location (Master only)
-
-```
-PUT /api/locations/:id
-```
-
-Request body:
-```json
-{
-  "name": "Updated Warehouse",
-  "address": "789 Third St"
-}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "name": "Updated Warehouse",
-    "address": "789 Third St"
-  }
-}
-```
-
-#### Delete location (Master only)
-
+1) Install dependencies
+```bash
+npm install
 ```
-DELETE /api/locations/:id
-```
-
-Response:
-```json
-{
-  "success": true,
-  "message": "Location deleted successfully"
-}
-```
-
-### Subcategory Routes
-
-All routes require authentication.
-
-> **Enhanced Features**: Subcategory management has been enhanced with improved categorization capabilities, better validation, and additional metadata support for more detailed product organization.
-
-#### Get all subcategories
-
-```
-GET /api/subcategories
-```
-
-Query parameters:
-- `page` (default: 1): Page number
-- `limit` (default: 10): Items per page
-
-Response:
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "name": "Subcategory 1",
-      "description": "Description of Subcategory 1"
-    }
-  ],
-  "total": 5,
-  "page": 1,
-  "limit": 10
-}
-```
-
-#### Get subcategory by ID
-
-```
-GET /api/subcategories/:id
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "name": "Subcategory 1",
-    "description": "Description of Subcategory 1"
-  }
-}
-```
-
-#### Create subcategory (Master only)
-
-```
-POST /api/subcategories
-```
 
-Request body:
-```json
-{
-  "name": "Subcategory 2",
-  "description": "Description of Subcategory 2"
-}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 2,
-    "name": "Subcategory 2",
-    "description": "Description of Subcategory 2"
-  }
-}
-```
+2) Configure environment
+Create a local env file named according to `NODE_ENV` (see `src/config/env.ts`): `.env.development.local` by default. Example variables:
+```env
+# Server
+PORT=3000
+NODE_ENV=development
 
-#### Update subcategory (Master only)
+# Database (central DB for multi-tenant metadata)
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=tenant_admin
+DB_PASSWORD=Tenant@123
+DB_NAME=central_db
 
-```
-PUT /api/subcategories/:id
-```
+# JWT
+JWT_SECRET=supersecret
+JWT_EXPIRES_IN=7d
 
-Request body:
-```json
-{
-  "name": "Updated Subcategory",
-  "description": "Updated description"
-}
+# Backups (used by backup.service)
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=root
+BACKUP_RETENTION_DAYS=7
 ```
 
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "name": "Updated Subcategory",
-    "description": "Updated description"
-  }
-}
+3) Start server
+```bash
+npm start
 ```
-
-#### Delete subcategory (Master only)
 
-```
-DELETE /api/subcategories/:id
-```
+---
 
-Response:
-```json
-{
-  "success": true,
-  "message": "Subcategory deleted successfully"
-}
-```
+## Docker Quickstart (Optional)
 
-### Product Formula Routes
+Using the included `docker-compose.yml`:
+- MySQL: service `mysql_v2` on host port `3306` -> container `3306`
+- App: service `app_v2` on host port `3000` -> container `3000`
 
-All routes require authentication.
+Steps:
+1) `docker compose up -d`
+2) API at `http://localhost:3000`
+3) Health check: `GET http://localhost:3000/health`
 
-#### Get all product formulas
+Note: When running in Docker, set `DB_HOST=mysql_v2` for the app service. The backup service also supports containerized MySQL via `MYSQL_HOST=mysql_v2`.
 
-```
-GET /api/product-formulas
-```
+## Tenant Onboarding (Free Trial / Self‑Serve)
 
-Query parameters:
-- `page` (default: 1): Page number
-- `limit` (default: 10): Items per page
-- `product_id` (optional): Filter by product
-
-Response:
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "product_id": 1,
-      "component_id": 2,
-      "quantity": 3.5,
-      "created_at": "2025-06-26T10:00:00.000Z",
-      "updated_at": "2025-06-26T10:00:00.000Z"
-    }
-  ],
-  "total": 20,
-  "page": 1,
-  "limit": 10
-}
-```
+The registration form collects only 6 fields:
+- factory_name
+- db_name
+- admin_username (no `@` allowed)
+- admin_password (min 6 chars)
+- admin_name
+- admin_email (optional)
 
-#### Get product formula by ID
+Defaults used by backend (not collected):
+- db_host: "mysql_v2"
+- db_port: 3306
+- db_user: "tenant_admin"
+- db_password: "Tenant@123"
 
-```
-GET /api/product-formulas/:id
-```
+Registration flow:
+1. Create factory metadata in `central_db`.
+2. Dynamically create factory database and full schema.
+3. Create first admin user in tenant DB.
+4. Initialize connection pool limits based on user count.
 
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "product_id": 1,
-    "product_name": "Product A",
-    "component_id": 2,
-    "component_name": "Component B",
-    "quantity": 3.5,
-    "created_at": "2025-06-26T10:00:00.000Z",
-    "updated_at": "2025-06-26T10:00:00.000Z"
-  }
-}
-```
+Login after registration:
+- Use `POST /api/auth/login` with `username@factory_db` and password.
 
-#### Get formulas for a product
+---
 
-```
-GET /api/product-formulas/product/:productId
-```
+## Factory Registration API
 
-Response:
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "product_id": 1,
-      "component_id": 2,
-      "component_name": "Component B",
-      "quantity": 3.5,
-      "created_at": "2025-06-26T10:00:00.000Z",
-      "updated_at": "2025-06-26T10:00:00.000Z"
-    }
-  ]
-}
-```
+- `POST /api/factory/register` — create factory DB, schema, and first admin user
+- `GET /api/factory/factories` — list registered factories (public info)
+- `POST /api/factory/sync-connections` — recompute optimal `max_connections` for all factories
 
-#### Create product formula (Master only)
+Notes:
+- Admin login format is returned in the response: `admin_username@db_name`
+- Connection pool scales automatically as users are added/removed
 
-```
-POST /api/product-formulas
-```
+## Authentication & Authorization
 
-Request body:
-```json
-{
-  "product_id": 1,
-  "component_id": 2,
-  "quantity": 3.5
-}
-```
+- Login requires `username@factory_db`. Backend extracts `factory_db`, resolves DB credentials from `central_db`, and authenticates against the tenant’s Users table.
+- JWT includes `factory_db` and user role. Middleware initializes the tenant pool and attaches it to the request.
+- All protected routes operate exclusively on the tenant database.
+- Only master users can create employees and access admin‑only endpoints (e.g., manual backups).
 
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "product_id": 1,
-    "component_id": 2,
-    "quantity": 3.5,
-    "created_at": "2025-06-26T10:00:00.000Z",
-    "updated_at": "2025-06-26T10:00:00.000Z"
-  }
-}
-```
+---
 
-#### Update product formula (Master only)
+## Multi‑Tenant Routing Flow
 
-```
-PUT /api/product-formulas/:id
-```
+1. Client sends credentials using `username@factory_db`
+2. Backend extracts `factory_db` and reads its connection info from the central database
+3. A tenant-specific pool is created/reused and cached in memory
+4. On successful login, JWT embeds `factory_db` and role
+5. Middleware attaches the tenant pool to each authenticated request
 
-Request body:
-```json
-{
-  "quantity": 4.0
-}
-```
+## Dynamic Connection Pool Scaling
 
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "product_id": 1,
-    "component_id": 2,
-    "quantity": 4.0,
-    "updated_at": "2025-06-26T11:00:00.000Z",
-    // ... other fields
-  }
-}
-```
+- Formula: `max_connections = max(user_count + 2, 5)`.
+- Auto‑sync on user create/delete; no manual steps required for normal ops.
+- Initial setup for new factory sets sensible defaults (e.g., 5 with 1 admin user).
+- Manual sync endpoint provided for maintenance:
+  - `POST /api/factory/sync-connections`
 
-#### Delete product formula (Master only)
+Benefits:
+- Efficient resource usage, scales with team size, fail‑safe if sync fails.
 
-```
-DELETE /api/product-formulas/:id
-```
+---
 
-Response:
-```json
-{
-  "success": true,
-  "message": "Product formula deleted successfully"
-}
-```
+## Automated MySQL Backups
 
-## Stock Alert System
-
-The Inventory Management System includes a comprehensive and enhanced stock threshold alert mechanism that automatically monitors inventory levels and notifies master users when products fall below their defined minimum thresholds.
-
-> **Recent Enhancements**: The alert system has been improved with better notification handling, enhanced location and subcategory tracking, and more robust alert resolution workflows.
-
-#### Key Features
-
-- **Automatic Monitoring**: The system continuously monitors stock levels after every inventory operation
-- **Threshold Configuration**: Each product can have its own minimum stock threshold (`min_stock_threshold`) 
-- **In-App Notifications**: Alerts are immediately available in the admin dashboard
-- **Alert Management**: Master users can mark alerts as resolved after taking action
-- **Manual Checking**: Admins can manually trigger threshold checks at any time
-
-#### How It Works
-
-1. When inventory operations occur (adding or removing stock), the system automatically:
-   - Calculates current stock levels for affected products
-   - Compares them against their configured minimum thresholds
-   - Generates alerts for products that fall below threshold
-   - Creates in-app notifications for master users
-
-2. Alerts are stored in two database tables:
-   - `StockAlerts`: Tracks all threshold violations with product details and resolution status
-   - `Notifications`: Stores user-specific notifications for the admin dashboard
-
-3. Master users can:
-   - View all products currently below threshold 
-   - See detailed alert information with product and location data
-   - Mark alerts as resolved after addressing the issue
-   - Manually trigger checks for new alerts
-
-#### Stock Alert APIs
-
-| Method | Endpoint | Description | Authorization |
-|--------|----------|-------------|--------------|
-| GET | `/api/alerts` | Get all stock alerts with pagination | Any |
-| GET | `/api/alerts/stock/threshold` | Get products below minimum threshold | Any |
-| PATCH | `/api/alerts/:id/resolve` | Mark an alert as resolved | Master |
-| POST | `/api/alerts/check` | Manually trigger check for new alerts | Master |
-
-#### Sample API Responses
-
-**Get all alerts:**
-```json
-{
-  "success": true,
-  "count": 2,
-  "total": 5,
-  "page": 1,
-  "limit": 10,
-  "data": [
-    {
-      "id": 1,
-      "product_id": 5,
-      "product_name": "Steel Sheet 5mm",
-      "current_stock": 45.5,
-      "min_threshold": 50,
-      "location_name": "Main Warehouse",
-      "created_at": "2025-06-26T10:30:15.000Z",
-      "is_resolved": false,
-      "resolved_at": null
-    },
-    {
-      "id": 2,
-      "product_id": 8,
-      "product_name": "Blue Paint",
-      "current_stock": 3,
-      "min_threshold": 5,
-      "location_name": "Paint Shop",
-      "created_at": "2025-06-26T11:15:22.000Z",
-      "is_resolved": false,
-      "resolved_at": null
-    }
-  ]
-}
-```
+- Scheduled every 4 hours using `node-cron` and `mysqldump` (cron: `0 */4 * * *`). Adjust in `src/services/backup.service.ts` as needed.
+- Retention policy deletes backups older than 7 days.
+- Backups stored in `db-backups/` (gitignored).
+- Manual (master‑only) endpoints:
+  - `GET /api/backup/status`
+  - `POST /api/backup/trigger`
+  - `POST /api/backup/cleanup`
 
-**Products below threshold:**
-```json
-{
-  "success": true,
-  "count": 3,
-  "data": [
-    {
-      "id": 5,
-      "name": "Steel Sheet 5mm",
-      "min_stock_threshold": 50,
-      "current_stock": 45.5,
-      "location_id": 1,
-      "location_name": "Main Warehouse"
-    },
-    // ...more products
-  ]
-}
+Environment (defaults OK):
+```env
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=root
+BACKUP_RETENTION_DAYS=7
 ```
-
-#### Implementing in the Admin Dashboard
 
-To implement the alert system in your frontend admin dashboard:
+Notes:
+- Backs up central DB and all tenant DBs in a single transaction dump.
+- Logs progress and results; cleans up old files automatically.
 
-1. **Setup:**
-   - Set appropriate `min_stock_threshold` values for each product when creating/updating them
+---
 
-2. **Dashboard Display:**
-   - Poll the `/api/alerts?resolved=false` endpoint periodically to fetch active alerts
-   - Display a notification count or badge showing the number of unresolved alerts
-   - Create a dedicated alerts section on the dashboard
+## Frontend Notes
 
-3. **Alert Handling:**
-   - Show alert details including product name, current stock, threshold, and location
-   - Provide action buttons for restocking or viewing product details
-   - Allow admins to mark alerts as resolved using the `PATCH /api/alerts/:id/resolve` endpoint
-   
-4. **Manual Checking:**
-   - Provide a "Check Alerts" button that calls `POST /api/alerts/check` to manually trigger a threshold check
+- Login form must accept `username@factory_db` format.
+- Registration form includes only 6 fields listed above.
+- Optional UX: display username without the `@factory_db` suffix in UI only.
 
-#### Integration with Inventory Operations
+---
 
-The alert system is automatically triggered after these operations:
-- Adding inventory (manual_in)
-- Removing inventory (manual_out)
-- Manufacturing processes (manufacturing_in/out)
+## Troubleshooting
 
-This ensures real-time monitoring without requiring manual checks.
+- __ER_ACCESS_DENIED_ERROR__: Ensure tenant creation uses `tenant_admin` with proper GRANTs and correct credentials in `central_db`.
+- __ER_UNSUPPORTED_PS__: We use `connection.query` and multi‑statement execution where needed.
+- __Pool not found__: Ensure requests are authenticated; the auth middleware initializes the tenant pool after JWT verification.
+- __MySQL host unreachable__: Verify `MYSQL_HOST`/`MYSQL_PORT` match your MySQL instance and that `mysqldump` is available on PATH.
 
-## Customization Options
+---
 
-### Environment Variables
+## Production Recommendations
 
-The system can be customized through environment variables:
+- Secure env vars and secrets management.
+- Monitor backup success and storage usage.
+- Consider offloading backups to cloud storage and encrypting files.
+- Periodically test restore procedures and run DR drills.
 
-- `PORT`: Server port (default: 3000)
-- `DB_HOST`: Database host (default: localhost)
-- `DB_USER`: Database user
-- `DB_PASSWORD`: Database password
-- `DB_DATABASE`: Database name
-- `JWT_SECRET`: Secret for JWT signing
-- `JWT_EXPIRES_IN`: Token expiration time (default: '24h')
-- `CORS_ORIGIN`: Allowed CORS origin (default: '*')
-- `NODE_ENV`: Environment mode ('development' or 'production')
+---
 
-### Automatic Directory Creation
+## API Overview
 
-The system automatically creates required directories:
-- `logs/`: Created automatically for crash logs and system logs
-- Crash logs are stored in `logs/crashes.log`
+All protected routes automatically use the tenant database resolved from JWT. Key domains include users, products, inventory entries, product formulas (single‑table with JSON components), audit logs (rich filtering), and stock alerts.
 
-### Pagination
+This README focuses on features, architecture, and usage. Route-level examples have been removed.
 
-Pagination defaults can be customized in the respective controller files:
-- Default page size (limit): 10 items per page
-- Maximum page size: 100 items per page
-
-### Authentication Options
-
-- Token expiration time: Can be configured through `JWT_EXPIRES_IN` environment variable
-- Password hashing: Uses bcrypt with 10 rounds (configurable in auth.service.ts)
-
-### Auditing Options
-
-Configure which fields to include in audit logs by modifying the `auditLog.repository.ts` file:
-- You can customize which fields are captured in `old_data` and `new_data`
-- You can add or remove actions that trigger audit logs
-
-## Error Handling
-
-The API uses a standardized error response format:
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human readable error message"
-  }
-}
-```
+### Routes Map
+- `GET /health` — service health
+- `GET /` — API root
+- `POST /api/factory` and related — tenant registration & maintenance (public)
+- `POST /api/auth/login` — multi-tenant login with `username@factory_db`
+- `/api/users` — user management
+- `/api/products` — unified product listing/search with filters
+- `/api/locations` — location management
+- `/api/subcategories` — subcategory management
+- `/api/product-formulas` — product BOMs (single-table JSON components)
+- `/api/purchase-info` — supplier/vendor management
+- `/api/inventory` — inventory entries and balance
+- `/api/audit-logs` — audit trail with rich filtering
+- `/api/alerts` — stock threshold alerts
+- `/api/notifications` — in-app notifications
+- `/api/backup` — backup status/trigger/cleanup
 
-Common error codes:
-
-- `10001` to `19999`: Authentication/Authorization errors
-- `20001` to `29999`: Validation errors
-- `30001` to `39999`: General resource errors
-- `40001` to `49999`: Product related errors
-- `50001` to `59999`: Location related errors
-- `60001` to `69999`: Subcategory related errors
-- `70001` to `79999`: Inventory entry related errors
-- `80001` to `89999`: Audit log related errors
-- `90001` to `99999`: Product formula related errors
+### API Highlights
+- __Products (unified)__: `GET /api/products?search=steel&category=raw&subcategory_id=1&location_id=2&page=1&limit=20`
+- __Inventory filters__: Search, entry type, user, location, reference, product hierarchy, date range, pagination
+- __Audit log filters__: Search, action, user, location, flag, reference, product hierarchy, date range, pagination
+- __Stock alerts__: `GET /api/alerts` (list), `GET /api/alerts/stock/threshold` (below min), `PATCH /api/alerts/:id/resolve`
 
+---
+ 
 ## Crash Recovery System
 
 The API includes a robust crash recovery system that ensures maximum uptime and reliability in production environments.

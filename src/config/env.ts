@@ -28,6 +28,7 @@ export const DB_PORT = parseInt(process.env.DB_PORT || '3306', 10);
 // JWT: assert that these are defined
 export const JWT_SECRET = process.env.JWT_SECRET!;
 export const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
+export const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN;
 
 //cors
 export const CORS_ORIGIN = process.env.CORS_ORIGIN;
@@ -37,3 +38,14 @@ export const CORS_ORIGIN3 = process.env.CORS_ORIGIN3;
 export const CORS_ORIGIN4 = process.env.CORS_ORIGIN4;
 export const CORS_ORIGIN5 = process.env.CORS_ORIGIN5;
 export const CORS_ORIGIN6 = process.env.CORS_ORIGIN6;
+
+// Tenant DB admin (used only for provisioning tenant databases)
+export const TENANT_DB_ADMIN_USER = process.env.TENANT_DB_ADMIN_USER;
+export const TENANT_DB_ADMIN_PASSWORD = process.env.TENANT_DB_ADMIN_PASSWORD;
+
+// MySQL/Backup env for backup.service
+export const MYSQL_HOST = process.env.MYSQL_HOST;
+export const MYSQL_PORT = parseInt(process.env.MYSQL_PORT || '3306', 10);
+export const MYSQL_USER = process.env.MYSQL_USER;
+export const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD;
+export const BACKUP_RETENTION_DAYS = parseInt(process.env.BACKUP_RETENTION_DAYS || '7', 10);

@@ -2,13 +2,18 @@ import { db } from '../database/db.ts';
 import { Location, LocationCreateParams, LocationUpdateParams } from '../models/locations.model.ts';
 import { ResultSetHeader } from 'mysql2';
 import { ERRORS } from '../utils/error.ts';
+import { Pool } from 'mysql2/promise';
 
 export class LocationRepository {
+    private getPool(req?: any): Pool {
+      return req?.factoryPool || db;
+    }
   /**
    * Find a location by its ID
    */
-  async findById(id: number): Promise<Location | null> {
-    const [locations] = await db.execute(
+  async findById(id: number, req?: any): Promise<Location | null> {
+    const pool = this.getPool(req);
+    const [locations] = await pool.execute(
       'SELECT * FROM Locations WHERE id = ?',
       [id]
     ) as [Location[], any];
@@ -19,8 +24,9 @@ export class LocationRepository {
   /**
    * Find a location by name
    */
-  async findByName(name: string): Promise<Location | null> {
-    const [locations] = await db.execute(
+  async findByName(name: string, req?: any): Promise<Location | null> {
+    const pool = this.getPool(req);
+    const [locations] = await pool.execute(
       'SELECT * FROM Locations WHERE name = ?',
       [name]
     ) as [Location[], any];
@@ -31,8 +37,9 @@ export class LocationRepository {
   /**
    * Get all locations
    */
-  async getAllLocations(): Promise<Location[]> {
-    const [locations] = await db.execute(
+  async getAllLocations(req?: any): Promise<Location[]> {
+    const pool = this.getPool(req);
+    const [locations] = await pool.execute(
       'SELECT * FROM Locations ORDER BY name'
     ) as [Location[], any];
 
@@ -42,11 +49,11 @@ export class LocationRepository {
   /**
    * Create a new location
    */
-  async create(location: LocationCreateParams): Promise<Location> {
+  async create(location: LocationCreateParams, req?: any): Promise<Location> {
     const { name, address, factory_id } = location;
 
     // Check for duplicate location name
-    const [existingLocations] = await db.execute(
+    const [existingLocations] = await this.getPool(req).execute(
       'SELECT id FROM Locations WHERE name = ?',
       [name]
     ) as [any[], any];
@@ -55,29 +62,29 @@ export class LocationRepository {
       throw ERRORS.DUPLICATE_RESOURCE;
     }
 
-    const [result] = await db.execute(
+    const [result] = await this.getPool(req).execute(
       'INSERT INTO Locations (name, address, factory_id) VALUES (?, ?, ?)',
       [name, address || null, factory_id === undefined ? 1 : factory_id]
     ) as [ResultSetHeader, any];
 
-    return this.findById(result.insertId) as Promise<Location>;
+    return this.findById(result.insertId, req) as Promise<Location>;
   }
 
   /**
    * Update location
    */
-  async update(id: number, locationData: LocationUpdateParams): Promise<Location> {
+  async update(id: number, locationData: LocationUpdateParams, req?: any): Promise<Location> {
     const { name, address, factory_id } = locationData;
 
     // Check if the location exists
-    const location = await this.findById(id);
+    const location = await this.findById(id, req);
     if (!location) {
       throw ERRORS.RESOURCE_NOT_FOUND;
     }
 
     // If name is being updated, check for duplicates
     if (name && name !== location.name) {
-      const [existingLocations] = await db.execute(
+      const [existingLocations] = await this.getPool(req).execute(
         'SELECT id FROM Locations WHERE name = ? AND id != ?',
         [name, id]
       ) as [any[], any];
@@ -111,23 +118,23 @@ export class LocationRepository {
     query += ' WHERE id = ?';
     params.push(id);
 
-    await db.execute(query, params);
+    await this.getPool(req).execute(query, params);
 
-    return this.findById(id) as Promise<Location>;
+    return this.findById(id, req) as Promise<Location>;
   }
 
   /**
    * Delete a location
    */
-  async deleteLocation(id: number): Promise<boolean> {
+  async deleteLocation(id: number, req?: any): Promise<boolean> {
     // Check if location exists
-    const location = await this.findById(id);
+    const location = await this.findById(id, req);
     if (!location) {
       throw ERRORS.RESOURCE_NOT_FOUND;
     }
     
     // Check if location is in use by any products
-    const [productsUsingLocation] = await db.execute(
+    const [productsUsingLocation] = await this.getPool(req).execute(
       'SELECT COUNT(*) as count FROM Products WHERE location_id = ?',
       [id]
     ) as [any[], any];
@@ -136,7 +143,7 @@ export class LocationRepository {
       throw ERRORS.LOCATION_IN_USE;
     }
 
-    const [result] = await db.execute(
+    const [result] = await this.getPool(req).execute(
       'DELETE FROM Locations WHERE id = ?',
       [id]
     ) as [ResultSetHeader, any];

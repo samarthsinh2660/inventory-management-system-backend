@@ -1,5 +1,6 @@
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { db } from "../database/db.ts";
+import { Pool } from "mysql2/promise";
 import { ERRORS, RequestError } from "../utils/error.ts";
 import { 
   InventoryEntry, 
@@ -13,20 +14,22 @@ import {
 import { FormulaComponentData } from "../models/productFormula.model.ts";
 
 export class InventoryEntryRepository {
-  
+  private getPool(req?: any): Pool {
+    return req?.factoryPool || db;
+  }
   /**
    * Finds all inventory entries with optional pagination (legacy method)
    */
-  async findAll(page: number = 1, limit: number = 100): Promise<{ entries: InventoryEntry[], total: number }> {
+  async findAll(page: number = 1, limit: number = 100, req?: any): Promise<{ entries: InventoryEntry[], total: number }> {
     // Use the new filtering method with empty filters for backward compatibility
-    const result = await this.findAllWithFilters({ page, limit });
+    const result = await this.findAllWithFilters({ page, limit }, req);
     return { entries: result.entries, total: result.total };
   }
 
   /**
    * Finds inventory entries with comprehensive filtering support
    */
-  async findAllWithFilters(filters: InventoryEntryFilters): Promise<FilteredInventoryEntriesResponse> {
+  async findAllWithFilters(filters: InventoryEntryFilters, req?: any): Promise<FilteredInventoryEntriesResponse> {
     try {
       const page = filters.page || 1;
       const limit = Math.min(filters.limit || 100, 100); // Cap at 100
@@ -136,7 +139,7 @@ export class InventoryEntryRepository {
         LIMIT ${parseInt(limit.toString())} OFFSET ${parseInt(offset.toString())}
       `;
       
-      const [entries] = await db.execute<InventoryEntry[]>(entriesQuery, queryParams);
+      const [entries] = await this.getPool(req).execute<InventoryEntry[]>(entriesQuery, queryParams);
       
       // Get total count with the same filters
       const countQuery = `
@@ -145,7 +148,7 @@ export class InventoryEntryRepository {
         ${whereClause}
       `;
       
-      const [countResult] = await db.execute<RowDataPacket[]>(countQuery, queryParams);
+      const [countResult] = await this.getPool(req).execute<RowDataPacket[]>(countQuery, queryParams);
       const total = countResult[0]?.total || 0;
       
       return {
@@ -162,9 +165,9 @@ export class InventoryEntryRepository {
   /**
    * Finds a specific inventory entry by ID
    */
-  async findById(id: number): Promise<InventoryEntry | null> {
+  async findById(id: number, req?: any): Promise<InventoryEntry | null> {
     try {
-      const [entries] = await db.execute<InventoryEntry[]>(`
+      const [entries] = await this.getPool(req).execute<InventoryEntry[]>(`
         SELECT ie.*, p.name as product_name, l.name as location_name, u.username
         FROM InventoryEntries ie
         JOIN Products p ON ie.product_id = p.id
@@ -183,8 +186,8 @@ export class InventoryEntryRepository {
   /**
    * Creates a new inventory entry
    */
-  async create(entryData: InventoryEntryCreateParams): Promise<InventoryEntry> {
-    const connection = await db.getConnection();
+  async create(entryData: InventoryEntryCreateParams, req?: any): Promise<InventoryEntry> {
+    const connection = await this.getPool(req).getConnection();
     try {
       await connection.beginTransaction();
       
@@ -256,7 +259,7 @@ export class InventoryEntryRepository {
       await connection.commit();
       
       // Return the created entry
-      const entry = await this.findById(entryId) as InventoryEntry;
+      const entry = await this.findById(entryId, req) as InventoryEntry;
       
       // Alert checking is now handled in the controller layer
       
@@ -282,13 +285,13 @@ export class InventoryEntryRepository {
   /**
    * Updates an existing inventory entry
    */
-  async update(id: number, entryData: InventoryEntryUpdateParams): Promise<InventoryEntry> {
-    const connection = await db.getConnection();
+  async update(id: number, entryData: InventoryEntryUpdateParams, req?: any): Promise<InventoryEntry> {
+    const connection = await this.getPool(req).getConnection();
     try {
       await connection.beginTransaction();
       
       // Check if the entry exists
-      const existingEntry = await this.findById(id);
+      const existingEntry = await this.findById(id, req);
       if (!existingEntry) {
         throw ERRORS.INVENTORY_ENTRY_NOT_FOUND;
       }
@@ -358,7 +361,7 @@ export class InventoryEntryRepository {
       await connection.commit();
       
       // Return the updated entry
-      return await this.findById(id) as InventoryEntry;
+      return await this.findById(id, req) as InventoryEntry;
     } catch (error) {
       await connection.rollback();
       console.error(`Error updating inventory entry with id ${id}:`, error);
@@ -377,13 +380,13 @@ export class InventoryEntryRepository {
   /**
    * Deletes an inventory entry
    */
-  async delete(id: number): Promise<void> {
-    const connection = await db.getConnection();
+  async delete(id: number, req?: any): Promise<void> {
+    const connection = await this.getPool(req).getConnection();
     try {
       await connection.beginTransaction();
       
       // Check if the entry exists
-      const entry = await this.findById(id);
+      const entry = await this.findById(id, req);
       if (!entry) {
         throw ERRORS.INVENTORY_ENTRY_NOT_FOUND;
       }
@@ -424,7 +427,7 @@ export class InventoryEntryRepository {
   /**
    * Gets the inventory balance for all products or by location
    */
-  async getBalance(locationId?: number): Promise<InventoryBalance> {
+  async getBalance(locationId?: number, req?: any): Promise<InventoryBalance> {
     try {
       let query = `
 SELECT 
@@ -467,7 +470,7 @@ LEFT JOIN
         ORDER BY p.name, l.name
       `;
       
-      const [results] = await db.execute<RowDataPacket[]>(query, params);
+      const [results] = await this.getPool(req).execute<RowDataPacket[]>(query, params);
       
       const products = results.map((row: RowDataPacket) => ({
         product_id: row.product_id,
@@ -495,13 +498,14 @@ LEFT JOIN
   async findByProduct(
     productId: number, 
     page: number = 1, 
-    limit: number = 10
+    limit: number = 10,
+    req?: any
   ): Promise<{ entries: InventoryEntry[], total: number }> {
     try {
       const offset = (page - 1) * limit;
       
       // First, get the product name
-      const [productResult] = await db.execute<RowDataPacket[]>(
+      const [productResult] = await this.getPool(req).execute<RowDataPacket[]>(
         'SELECT name FROM Products WHERE id = ?', 
         [productId]
       );
@@ -531,10 +535,10 @@ LEFT JOIN
         LIMIT ${parseInt(limit.toString())} OFFSET ${parseInt(offset.toString())}
       `;
       
-      const [entries] = await db.execute<InventoryEntry[]>(query, [productId]);
+      const [entries] = await this.getPool(req).execute<InventoryEntry[]>(query, [productId]);
       
       // Get total count for pagination
-      const [totalResult] = await db.execute<RowDataPacket[]>(
+      const [totalResult] = await this.getPool(req).execute<RowDataPacket[]>(
         'SELECT COUNT(*) as total FROM InventoryEntries WHERE product_id = ?', 
         [productId]
       );
@@ -561,14 +565,15 @@ LEFT JOIN
   async createWithFormulaComponents(
     mainEntryData: InventoryEntryCreateParams, 
     formulaComponents: FormulaComponentData[],
-    productionQuantity: number
+    productionQuantity: number,
+    req?: any
   ): Promise<{ mainEntry: InventoryEntry, componentEntries: InventoryEntry[] }> {
-    const connection = await db.getConnection();
+    const connection = await this.getPool(req).getConnection();
     try {
       await connection.beginTransaction();
       
       // Validate that the main product can only have inventory entries at its assigned location
-      const [mainProductLocation] = await connection.execute<RowDataPacket[]>(`
+      const [mainProductLocation] = await this.getPool(req).execute<RowDataPacket[]>(`
         SELECT location_id, name 
         FROM Products 
         WHERE id = ?
@@ -588,7 +593,7 @@ LEFT JOIN
         const componentQuantity = component.quantity * productionQuantity;
         
         // Check if there's enough inventory for this component
-        const [currentBalance] = await connection.execute<RowDataPacket[]>(`
+        const [currentBalance] = await this.getPool(req).execute<RowDataPacket[]>(`
           SELECT COALESCE(SUM(
             CASE 
               WHEN entry_type IN ('manual_in', 'manufacturing_in') THEN quantity
@@ -611,7 +616,7 @@ LEFT JOIN
       }
       
       // Insert the main product entry (the manufactured product)
-      const [mainResult] = await connection.execute<ResultSetHeader>(`
+      const [mainResult] = await this.getPool(req).execute<ResultSetHeader>(`
         INSERT INTO InventoryEntries 
         (product_id, quantity, entry_type, user_id, location_id, notes, reference_id) 
         VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -635,7 +640,7 @@ LEFT JOIN
         const componentQuantity = component.quantity * productionQuantity;
         
         // Create entry for component deduction (negative quantity for deduction)
-        const [componentResult] = await connection.execute<ResultSetHeader>(`
+        const [componentResult] = await this.getPool(req).execute<ResultSetHeader>(`
           INSERT INTO InventoryEntries 
           (product_id, quantity, entry_type, user_id, location_id, notes, reference_id) 
           VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -656,11 +661,11 @@ LEFT JOIN
       await connection.commit();
       
       // Retrieve all created entries
-      const mainEntry = await this.findById(mainEntryId) as InventoryEntry;
+      const mainEntry = await this.findById(mainEntryId, req) as InventoryEntry;
       
       const componentEntries: InventoryEntry[] = [];
       for (const id of componentEntryIds) {
-        const entry = await this.findById(id) as InventoryEntry;
+        const entry = await this.findById(id, req) as InventoryEntry;
         componentEntries.push(entry);
       }
       
@@ -696,7 +701,8 @@ LEFT JOIN
   async getUserInventoryEntries(
     userId: number,
     page: number = 1,
-    limit: number = 10
+    limit: number = 10,
+    req?: any
   ): Promise<{ 
     username: string, 
     entries: InventoryEntry[],
@@ -706,7 +712,7 @@ LEFT JOIN
       const offset = (page - 1) * limit;
       
       // First, get the username
-      const [userResult] = await db.execute<RowDataPacket[]>(
+      const [userResult] = await this.getPool(req).execute<RowDataPacket[]>(
         'SELECT username FROM Users WHERE id = ?', 
         [userId]
       );
@@ -736,10 +742,10 @@ LEFT JOIN
         LIMIT ${parseInt(limit.toString())} OFFSET ${parseInt(offset.toString())}
       `;
       
-      const [entries] = await db.execute<InventoryEntry[]>(query, [userId]);
+      const [entries] = await this.getPool(req).execute<InventoryEntry[]>(query, [userId]);
       
       // Get total count for pagination
-      const [totalResult] = await db.execute<RowDataPacket[]>(
+      const [totalResult] = await this.getPool(req).execute<RowDataPacket[]>(
         'SELECT COUNT(*) as total FROM InventoryEntries WHERE user_id = ?', 
         [userId]
       );

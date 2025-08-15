@@ -1,14 +1,19 @@
 import { db } from '../database/db.ts';
+import { Pool } from 'mysql2/promise';
 import { Subcategory, SubcategoryCreateParams, SubcategoryUpdateParams } from '../models/subCategories.model.ts';
 import { ResultSetHeader } from 'mysql2';
 import { ERRORS } from '../utils/error.ts';
 
 export class SubcategoryRepository {
+    private getPool(req?: any): Pool {
+      return req?.factoryPool || db;
+    }
   /**
    * Find a subcategory by its ID
    */
-  async findById(id: number): Promise<Subcategory | null> {
-    const [subcategories] = await db.execute(
+  async findById(id: number, req?: any): Promise<Subcategory | null> {
+    const pool = this.getPool(req);
+    const [subcategories] = await pool.execute(
       'SELECT * FROM Subcategories WHERE id = ?',
       [id]
     ) as [Subcategory[], any];
@@ -19,8 +24,9 @@ export class SubcategoryRepository {
   /**
    * Find a subcategory by name
    */
-  async findByName(name: string): Promise<Subcategory | null> {
-    const [subcategories] = await db.execute(
+  async findByName(name: string, req?: any): Promise<Subcategory | null> {
+    const pool = this.getPool(req);
+    const [subcategories] = await pool.execute(
       'SELECT * FROM Subcategories WHERE name = ?',
       [name]
     ) as [Subcategory[], any];
@@ -31,8 +37,9 @@ export class SubcategoryRepository {
   /**
    * Get all subcategories
    */
-  async getAllSubcategories(): Promise<Subcategory[]> {
-    const [subcategories] = await db.execute(
+  async getAllSubcategories(req?: any): Promise<Subcategory[]> {
+    const pool = this.getPool(req);
+    const [subcategories] = await pool.execute(
       'SELECT * FROM Subcategories ORDER BY name'
     ) as [Subcategory[], any];
 
@@ -42,8 +49,9 @@ export class SubcategoryRepository {
   /**
    * Get subcategories by category
    */
-  async getSubcategoriesByCategory(category: string): Promise<Subcategory[]> {
-    const [subcategories] = await db.execute(
+  async getSubcategoriesByCategory(category: string, req?: any): Promise<Subcategory[]> {
+    const pool = this.getPool(req);
+    const [subcategories] = await pool.execute(
       'SELECT * FROM Subcategories WHERE category = ? ORDER BY name',
       [category]
     ) as [Subcategory[], any];
@@ -54,11 +62,11 @@ export class SubcategoryRepository {
   /**
    * Create a new subcategory
    */
-  async create(subcategory: SubcategoryCreateParams): Promise<Subcategory> {
+  async create(subcategory: SubcategoryCreateParams, req?: any): Promise<Subcategory> {
     const { category, name, description } = subcategory;
     
     // Check for duplicate subcategory name
-    const [existingSubcategories] = await db.execute(
+    const [existingSubcategories] = await this.getPool(req).execute(
       'SELECT id FROM Subcategories WHERE name = ?',
       [name]
     ) as [any[], any];
@@ -67,12 +75,12 @@ export class SubcategoryRepository {
       throw ERRORS.DUPLICATE_SUBCATEGORY_NAME;
     }
 
-    const [result] = await db.execute(
+    const [result] = await this.getPool(req).execute(
       'INSERT INTO Subcategories (category, name, description) VALUES (?, ?, ?)',
       [category, name, description || null]
     ) as [ResultSetHeader, any];
 
-    const newSubcategory = await this.findById(result.insertId);
+    const newSubcategory = await this.findById(result.insertId, req);
     if (!newSubcategory) {
       throw ERRORS.SUBCATEGORY_CREATION_FAILED;
     }
@@ -83,18 +91,18 @@ export class SubcategoryRepository {
   /**
    * Update subcategory
    */
-  async update(id: number, subcategoryData: SubcategoryUpdateParams): Promise<Subcategory> {
+  async update(id: number, subcategoryData: SubcategoryUpdateParams, req?: any): Promise<Subcategory> {
     const { category, name, description } = subcategoryData;
     
     // Check if the subcategory exists
-    const subcategory = await this.findById(id);
+    const subcategory = await this.findById(id, req);
     if (!subcategory) {
       throw ERRORS.RESOURCE_NOT_FOUND;
     }
 
     // Check for duplicate subcategory name
     if (name && name !== subcategory.name) {
-      const [existingSubcategories] = await db.execute(
+      const [existingSubcategories] = await this.getPool(req).execute(
         'SELECT id FROM Subcategories WHERE name = ? AND id != ?',
         [name, id]
       ) as [any[], any];
@@ -128,9 +136,9 @@ export class SubcategoryRepository {
     query += ' WHERE id = ?';
     params.push(id);
 
-    await db.execute(query, params);
+    await this.getPool(req).execute(query, params);
 
-    const updatedSubcategory = await this.findById(id);
+    const updatedSubcategory = await this.findById(id, req);
     if (!updatedSubcategory) {
       throw ERRORS.SUBCATEGORY_UPDATE_FAILED;
     }
@@ -141,15 +149,15 @@ export class SubcategoryRepository {
   /**
    * Delete a subcategory
    */
-  async deleteSubcategory(id: number): Promise<boolean> {
+  async deleteSubcategory(id: number, req?: any): Promise<boolean> {
     // Check if subcategory exists
-    const subcategory = await this.findById(id);
+    const subcategory = await this.findById(id, req);
     if (!subcategory) {
       throw ERRORS.RESOURCE_NOT_FOUND;
     }
     
     // Check if subcategory is in use by any products
-    const [productsUsingSubcategory] = await db.execute(
+    const [productsUsingSubcategory] = await this.getPool(req).execute(
       'SELECT COUNT(*) as count FROM Products WHERE subcategory_id = ?',
       [id]
     ) as [any[], any];
@@ -158,7 +166,7 @@ export class SubcategoryRepository {
       throw ERRORS.SUBCATEGORY_IN_USE;
     }
 
-    const [result] = await db.execute(
+    const [result] = await this.getPool(req).execute(
       'DELETE FROM Subcategories WHERE id = ?',
       [id]
     ) as [ResultSetHeader, any];

@@ -6,7 +6,7 @@ import {
 } from '../utils/response.ts';
 import { ERRORS, handleUnknownError, RequestError } from '../utils/error.ts';
 import auditLogRepository from '../repositories/auditLog.repository.ts';
-import { AuditLogFilter, AuditLogFilters } from '../models/auditLogs.model.ts'; 
+import { AuditLogFilters } from '../models/auditLogs.model.ts'; 
 
 /**
  * Get all audit logs with comprehensive filtering and pagination
@@ -139,7 +139,7 @@ export const getAllLogs = async (req: Request, res: Response): Promise<void> => 
     }
     
     // Call repository with comprehensive filters
-    const result = await auditLogRepository.findAllWithFilters(filters);
+    const result = await auditLogRepository.findAllWithFilters(filters, req);
     
     const page = filters.page || 1;
     const limit = filters.limit || 100;
@@ -185,7 +185,7 @@ export const getLogById = async (req: Request, res: Response): Promise<void> => 
       return;
     }
     
-    const log = await auditLogRepository.findById(logId);
+    const log = await auditLogRepository.findById(logId ,req);
     
     if (!log) {
       res.status(404).json({
@@ -235,7 +235,8 @@ export const getLogsByEntryId = async (req: Request, res: Response): Promise<voi
     const { logs, total } = await auditLogRepository.findByEntryId(
       entryId, 
       page, 
-      limit
+      limit,
+      req
     );
     
     res.json(responseWithMeta(
@@ -306,7 +307,7 @@ export const deleteLog = async (req: Request, res: Response): Promise<void> => {
     const isRevert = req.query.revert === 'true';
     
     // Delete the log (and potentially revert changes)
-    await auditLogRepository.deleteAndRevert(logId, (req.user as any).id, isRevert);
+    await auditLogRepository.deleteAndRevert(logId, (req.user as any).id, isRevert, req);
     
     const message = isRevert 
       ? 'Audit log deleted and changes reverted successfully' 
@@ -358,7 +359,7 @@ export const updateFlag = async (req: Request, res: Response): Promise<void> => 
       return;
     }
     
-    const updatedLog = await auditLogRepository.updateFlag(logId, is_flag);
+    const updatedLog = await auditLogRepository.updateFlag(logId, is_flag, req);
     
     res.json(successResponse(
       updatedLog,

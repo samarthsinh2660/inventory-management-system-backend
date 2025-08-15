@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
 import { RequestError } from '../utils/error.ts';
 import { errorResponse } from '../utils/response.ts';
+import { NODE_ENV } from '../config/env.ts';
 
 export const errorHandler = (
     error: Error | RequestError,
@@ -77,7 +78,7 @@ export const errorHandler = (
   // Handle any other unexpected errors
   res.status(500).json(
     errorResponse(
-      process.env.NODE_ENV === 'production'
+      NODE_ENV === 'production'
         ? 'Internal server error'
         : error.message,
       10004

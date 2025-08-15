@@ -3,12 +3,20 @@ import alertService from '../services/alert.service.ts';
 import { AlertRepository } from '../repositories/alert.repository.ts';
 import { ERRORS } from '../utils/error.ts';
 
+// Use an instance for multi-tenant aware methods
+const alertRepository = new AlertRepository();
+
 /**
  * Get all products that are currently below their minimum threshold
  */
 export const getProductsBelowThreshold = async (req: Request, res: Response): Promise<void> => {
   try {
-    const products = await alertService.getProductsBelowThreshold();
+    const tenantPool = (req as any).factoryPool;
+    if (!tenantPool) {
+      throw new Error('Tenant database pool not found');
+    }
+    
+    const products = await alertService.getProductsBelowThreshold(tenantPool);
     res.json({
       success: true,
       count: products.length,
@@ -33,11 +41,11 @@ export const getAllAlerts = async (req: Request, res: Response): Promise<void> =
     const resolved = req.query.resolved === 'true' ? true : 
                     req.query.resolved === 'false' ? false : null;
     
-    const { alerts, total } = await AlertRepository.getAllAlerts({
+    const { alerts, total } = await alertRepository.getAllAlerts({
       resolved,
       page,
       limit
-    });
+    }, req);
     
     res.json({
       success: true,
@@ -81,7 +89,7 @@ export const resolveAlert = async (req: Request, res: Response): Promise<void> =
     }
     
     // Mark alert as resolved
-    const affectedRows = await AlertRepository.resolveAlert(alertId);
+    const affectedRows = await alertRepository.resolveAlert(alertId, req);
     
     if (affectedRows === 0) {
       res.status(ERRORS.ALERT_NOT_FOUND.statusCode).json({
@@ -92,7 +100,7 @@ export const resolveAlert = async (req: Request, res: Response): Promise<void> =
     }
     
     // Mark related notifications as read
-    await AlertRepository.markAlertNotificationsAsRead(alertId);
+    await alertRepository.markAlertNotificationsAsRead(alertId, req);
     
     res.json({
       success: true,
@@ -112,8 +120,9 @@ export const resolveAlert = async (req: Request, res: Response): Promise<void> =
  */
 export const forceCheckAlerts = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Check user is master
-    if (!req.user || req.user.is_master !== true) {
+    const user = req.user as any;
+    
+    if (!user || user.role !== 'master') {
       res.status(ERRORS.ALERT_MASTER_ONLY.statusCode).json({
         success: false,
         message: ERRORS.ALERT_MASTER_ONLY.message
@@ -121,7 +130,12 @@ export const forceCheckAlerts = async (req: Request, res: Response): Promise<voi
       return;
     }
     
-    await alertService.checkAndSendAlerts();
+    const tenantPool = (req as any).factoryPool;
+    if (!tenantPool) {
+      throw new Error('Tenant database pool not found');
+    }
+    
+    await alertService.checkAndSendAlerts(tenantPool);
     
     res.json({
       success: true,
@@ -150,7 +164,7 @@ export const getUnreadNotifications = async (req: Request, res: Response): Promi
       return;
     }
     
-    const notifications = await AlertRepository.getUnreadNotifications();
+    const notifications = await alertRepository.getUnreadNotifications(req);
     
     res.json({
       success: true,
@@ -191,7 +205,7 @@ export const markNotificationAsRead = async (req: Request, res: Response): Promi
     }
     
     // Verify notification exists
-    const notification = await AlertRepository.getNotificationById(notificationId);
+    const notification = await alertRepository.getNotificationById(notificationId, req);
     
     if (!notification) {
       res.status(ERRORS.NOTIFICATION_NOT_FOUND.statusCode).json({
@@ -202,7 +216,7 @@ export const markNotificationAsRead = async (req: Request, res: Response): Promi
     }
     
     // Mark as read
-    await AlertRepository.markNotificationAsRead(notificationId);
+    await alertRepository.markNotificationAsRead(notificationId, req);
     
     res.json({
       success: true,

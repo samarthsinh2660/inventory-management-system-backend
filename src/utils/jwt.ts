@@ -1,6 +1,7 @@
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { ERRORS } from './error.ts';
 import { JWT_SECRET, JWT_EXPIRES_IN } from '../config/env.ts';
+import { JWT_REFRESH_EXPIRES_IN } from '../config/env.ts';
 
 
 
@@ -10,15 +11,21 @@ export interface TokenData {
     email?: string;
     username?: string;
     name?: string;
+    // Multi-tenant fields
+    factory_db?: string;
+    role?: string;
 }
 
 export function createAuthToken(user: TokenData): string {
     if (!JWT_SECRET) {
         throw ERRORS.JWT_SECRET_NOT_CONFIGURED;
     }
+    if (!JWT_EXPIRES_IN) {
+        throw ERRORS.JWT_SECRET_NOT_CONFIGURED;
+    }
     
     const token = jwt.sign(user, JWT_SECRET, {
-        expiresIn: JWT_EXPIRES_IN || '24h'
+        expiresIn: JWT_EXPIRES_IN
     } as SignOptions);
     
     return token;
@@ -28,11 +35,14 @@ export function createRefreshToken(user: TokenData): string {
     if (!JWT_SECRET) {
         throw ERRORS.JWT_SECRET_NOT_CONFIGURED;
     }
+    if (!JWT_REFRESH_EXPIRES_IN) {
+        throw ERRORS.JWT_SECRET_NOT_CONFIGURED;
+    }
     
     // Using same secret for simplicity, but in production you might want separate secrets
     const token = jwt.sign(user, JWT_SECRET, {
-        expiresIn: '7d' // Refresh tokens typically last longer
-    });
+        expiresIn: JWT_REFRESH_EXPIRES_IN
+    } as SignOptions);
     
     return token;
 }

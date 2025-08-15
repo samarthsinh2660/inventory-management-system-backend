@@ -10,7 +10,7 @@ UserRouter.use(authenticate, requireMaster);
 // User management routes (master only)
 UserRouter.get('/', getAllUsers);
 UserRouter.post('/', createUser);
-UserRouter.delete('/:id', deleteUser);
+UserRouter.delete('/:id', deleteUser);  
 UserRouter.patch('/:id', updateUser);
 
 export default UserRouter;

@@ -1,15 +1,21 @@
-import { db } from '../database/db.ts';
+import { db} from '../database/db.ts';
+import { Pool } from 'mysql2/promise';
 import { ProductFormula, ProductFormulaCreateParams, ProductFormulaUpdateParams, FormulaComponentData } from '../models/productFormula.model.ts';
 import { ResultSetHeader } from 'mysql2';
 import { ERRORS } from '../utils/error.ts';
 import { Product } from '../models/products.model.ts';
 
 export class ProductFormulaRepository {
+
+    private getPool(req?: any): Pool {
+      return req?.factoryPool || db;
+    }
   /**
    * Find a product formula by its ID
    */
-  async findById(id: number): Promise<ProductFormula | null> {
-    const [formulas] = await db.execute(
+  async findById(id: number, req?: any): Promise<ProductFormula | null> {
+    const pool = this.getPool(req);
+    const [formulas] = await pool.execute(
       `SELECT * FROM ProductFormula WHERE id = ?`,
       [id]
     ) as [any[], any];
@@ -31,8 +37,9 @@ export class ProductFormulaRepository {
   /**
    * Get all formulas
    */
-  async getAllFormulas(): Promise<ProductFormula[]> {
-    const [formulas] = await db.execute(
+  async getAllFormulas(req?: any): Promise<ProductFormula[]> {
+    const pool = this.getPool(req);
+    const [formulas] = await pool.execute(
       `SELECT * FROM ProductFormula ORDER BY name`
     ) as [any[], any];
 
@@ -47,8 +54,9 @@ export class ProductFormulaRepository {
   /**
    * Get formula by name
    */
-  async getByName(name: string): Promise<ProductFormula | null> {
-    const [formulas] = await db.execute(
+  async getByName(name: string, req?: any): Promise<ProductFormula | null> {
+    const pool = this.getPool(req);
+    const [formulas] = await pool.execute(
       `SELECT * FROM ProductFormula WHERE name = ?`,
       [name]
     ) as [any[], any];
@@ -70,18 +78,18 @@ export class ProductFormulaRepository {
   /**
    * Create a new formula
    */
-  async create(formulaData: ProductFormulaCreateParams): Promise<ProductFormula> {
+  async create(formulaData: ProductFormulaCreateParams, req?: any): Promise<ProductFormula> {
     const { name, description, components } = formulaData;
 
     // Check if formula with this name already exists
-    const existingFormula = await this.getByName(name);
+    const existingFormula = await this.getByName(name, req);
     if (existingFormula) {
       throw ERRORS.PRODUCT_FORMULA_NAME_EXISTS;
     }
 
     // Validate components exist in products
     for (const component of components) {
-      const [productExists] = await db.execute(
+      const [productExists] = await this.getPool(req).execute(
         'SELECT id, name FROM Products WHERE id = ?',
         [component.component_id]
       ) as [any[], any];
@@ -101,20 +109,20 @@ export class ProductFormulaRepository {
     }));
 
     // Store formula with JSON components
-    const [result] = await db.execute(
+    const [result] = await this.getPool(req).execute(
       `INSERT INTO ProductFormula (name, description, components) VALUES (?, ?, ?)`,
       [name, description || null, JSON.stringify(componentsWithIds)]
     ) as [ResultSetHeader, any];
 
-    return this.findById(result.insertId) as Promise<ProductFormula>;
+    return this.findById(result.insertId, req) as Promise<ProductFormula>;
   }
 
   /**
    * Update a product formula
    */
-  async update(id: number, updateData: ProductFormulaUpdateParams): Promise<ProductFormula> {
+  async update(id: number, updateData: ProductFormulaUpdateParams, req?: any): Promise<ProductFormula> {
     // Check if formula exists
-    const formula = await this.findById(id);
+    const formula = await this.findById(id, req);
     if (!formula) {
       throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
     }
@@ -127,7 +135,7 @@ export class ProductFormulaRepository {
     if (name !== undefined) {
       // Check for name duplicates if name is being changed
       if (name !== formula.name) {
-        const existingFormula = await this.getByName(name);
+        const existingFormula = await this.getByName(name, req);
         if (existingFormula) {
           throw ERRORS.PRODUCT_FORMULA_NAME_EXISTS;
         }
@@ -144,7 +152,7 @@ export class ProductFormulaRepository {
     if (components !== undefined) {
       // Validate components exist in products
       for (const component of components) {
-        const [productExists] = await db.execute(
+        const [productExists] = await this.getPool(req).execute(
           'SELECT id, name FROM Products WHERE id = ?',
           [component.component_id]
         ) as [any[], any];
@@ -174,26 +182,26 @@ export class ProductFormulaRepository {
     // Add ID to params array for WHERE clause
     params.push(id);
 
-    await db.execute(
+    await this.getPool(req).execute(
       `UPDATE ProductFormula SET ${updates.join(', ')} WHERE id = ?`,
       params
     );
 
-    return this.findById(id) as Promise<ProductFormula>;
+    return this.findById(id, req) as Promise<ProductFormula>;
   }
 
   /**
    * Delete a formula
    */
-  async delete(id: number): Promise<boolean> {
+  async delete(id: number, req?: any): Promise<boolean> {
     // Check if formula exists
-    const formula = await this.findById(id);
+    const formula = await this.findById(id, req);
     if (!formula) {
       throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
     }
 
     // Check if any product is using this formula
-    const [productsUsingFormula] = await db.execute(
+    const [productsUsingFormula] = await this.getPool(req).execute(
       'SELECT id FROM Products WHERE product_formula_id = ?',
       [id]
     ) as [any[], any];
@@ -202,7 +210,7 @@ export class ProductFormulaRepository {
       throw ERRORS.FORMULA_IN_USE;
     }
 
-    const [result] = await db.execute(
+    const [result] = await this.getPool(req).execute(
       'DELETE FROM ProductFormula WHERE id = ?',
       [id]
     ) as [ResultSetHeader, any];
@@ -213,8 +221,8 @@ export class ProductFormulaRepository {
   /**
    * Get products using a specific formula
    */
-  async getProductsUsingFormula(formulaId: number): Promise<Product[]> {
-    const [products] = await db.execute(
+  async getProductsUsingFormula(formulaId: number, req?: any): Promise<Product[]> {
+    const [products] = await this.getPool(req).execute(
       `SELECT p.* FROM Products p
        WHERE p.product_formula_id = ?`,
       [formulaId]
@@ -226,14 +234,14 @@ export class ProductFormulaRepository {
   /**
    * Add or update a component in a formula
    */
-  async updateFormulaComponent(formulaId: number, componentData: FormulaComponentData): Promise<ProductFormula> {
-    const formula = await this.findById(formulaId);
+  async updateFormulaComponent(formulaId: number, componentData: FormulaComponentData, req?: any): Promise<ProductFormula> {
+    const formula = await this.findById(formulaId, req);
     if (!formula) {
       throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
     }
 
     // Validate component exists in products
-    const [productExists] = await db.execute(
+    const [productExists] = await this.getPool(req).execute(
       'SELECT id, name FROM Products WHERE id = ?',
       [componentData.component_id]
     ) as [any[], any];
@@ -265,19 +273,19 @@ export class ProductFormulaRepository {
     }
 
     // Update formula with modified components
-    await db.execute(
+    await this.getPool(req).execute(
       'UPDATE ProductFormula SET components = ? WHERE id = ?',
       [JSON.stringify(components), formulaId]
     );
 
-    return this.findById(formulaId) as Promise<ProductFormula>;
+    return this.findById(formulaId, req) as Promise<ProductFormula>;
   }
 
   /**
    * Remove a component from a formula
    */
-  async removeFormulaComponent(formulaId: number, componentId: number): Promise<ProductFormula> {
-    const formula = await this.findById(formulaId);
+  async removeFormulaComponent(formulaId: number, componentId: number, req?: any): Promise<ProductFormula> {
+    const formula = await this.findById(formulaId, req);
     if (!formula) {
       throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
     }
@@ -293,12 +301,12 @@ export class ProductFormulaRepository {
     }
 
     // Update formula with modified components
-    await db.execute(
+    await this.getPool(req).execute(
       'UPDATE ProductFormula SET components = ? WHERE id = ?',
       [JSON.stringify(updatedComponents), formulaId]
     );
 
-    return this.findById(formulaId) as Promise<ProductFormula>;
+    return this.findById(formulaId, req) as Promise<ProductFormula>;
   }
 }
 

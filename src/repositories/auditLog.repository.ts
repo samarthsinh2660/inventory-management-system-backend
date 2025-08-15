@@ -1,17 +1,21 @@
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { db } from "../database/db.ts";
+import { Pool } from "mysql2/promise";
 import { ERRORS } from "../utils/error.ts";
 import { AuditLog, AuditLogCreateParams, AuditLogFilter, AuditLogFilters, FilteredAuditLogsResponse } from "../models/auditLogs.model.ts";
 import inventoryEntryRepository from "./inventoryEntry.repository.ts";
 import { InventoryEntryCreateParams } from "../models/inventoryEntries.model.ts";
 
 export class AuditLogRepository {
-  
+  private getPool(req?: any): Pool {
+    return req?.factoryPool || db;
+  }
   /**
    * Finds all audit logs with optional filtering and pagination (legacy method)
    */
   async findAll(
-    filter: AuditLogFilter = {}
+    filter: AuditLogFilter = {},
+    req?: any
   ): Promise<{ logs: AuditLog[], total: number }> {
     // Use the new filtering method with converted filters for backward compatibility
     const newFilters: AuditLogFilters = {
@@ -24,14 +28,14 @@ export class AuditLogRepository {
       is_flag: filter.is_flag
     };
     
-    const result = await this.findAllWithFilters(newFilters);
+    const result = await this.findAllWithFilters(newFilters, req);
     return { logs: result.logs, total: result.total };
   }
 
   /**
    * Finds all audit logs with comprehensive filtering and pagination
    */
-  async findAllWithFilters(filters: AuditLogFilters): Promise<FilteredAuditLogsResponse> {
+  async findAllWithFilters(filters: AuditLogFilters, req?: any): Promise<FilteredAuditLogsResponse> {
     try {
       const page = filters.page || 1;
       const limit = Math.min(filters.limit || 100, 100); // Cap at 100
@@ -179,12 +183,12 @@ export class AuditLogRepository {
       const selectQuery = `SELECT DISTINCT ${selectFields} ${baseQuery}${whereClause} ORDER BY al.timestamp DESC LIMIT ${limit} OFFSET ${offset}`;
 
     
-      const [logs] = await db.execute<AuditLog[]>(selectQuery, queryParams);
+      const [logs] = await this.getPool(req).execute<AuditLog[]>(selectQuery, queryParams);
 
       // Count query for total results
       const countQuery = `SELECT COUNT(DISTINCT al.id) as total ${baseQuery}${whereClause}`;
 
-      const [countResult] = await db.execute<RowDataPacket[]>(countQuery, queryParams);
+      const [countResult] = await this.getPool(req).execute<RowDataPacket[]>(countQuery, queryParams);
       const total = countResult[0]?.total || 0;
 
       return { 
@@ -201,9 +205,9 @@ export class AuditLogRepository {
   /**
    * Finds a specific audit log by ID
    */
-  async findById(id: number): Promise<AuditLog | null> {
+  async findById(id: number, req?: any): Promise<AuditLog | null> {
     try {
-      const [logs] = await db.execute<AuditLog[]>(`
+      const [logs] = await this.getPool(req).execute<AuditLog[]>(`
         SELECT al.*, u.username
         FROM AuditLogs al
         JOIN Users u ON al.user_id = u.id
@@ -220,10 +224,10 @@ export class AuditLogRepository {
   /**
    * Creates a new audit log entry
    */
-  async create(logData: AuditLogCreateParams): Promise<AuditLog> {
+  async create(logData: AuditLogCreateParams, req?: any): Promise<AuditLog> {
     try {
       // Insert the log
-      const [result] = await db.execute<ResultSetHeader>(`
+      const [result] = await this.getPool(req).execute<ResultSetHeader>(`
         INSERT INTO AuditLogs 
         (entry_id, action, old_data, new_data, user_id, reason) 
         VALUES (?, ?, ?, ?, ?, ?)
@@ -239,7 +243,7 @@ export class AuditLogRepository {
       const logId = result.insertId;
       
       // Return the created log
-      return await this.findById(logId) as AuditLog;
+      return await this.findById(logId, req) as AuditLog;
     } catch (error) {
       console.error("Error creating audit log:", error);
       throw ERRORS.AUDIT_LOG_CREATION_FAILED;
@@ -250,13 +254,13 @@ export class AuditLogRepository {
    * Deletes an audit log and reverts the changes if needed
    * Only master users can perform this operation
    */
-  async deleteAndRevert(id: number, userId: number, isRevert: boolean = false): Promise<void> {
-    const connection = await db.getConnection();
+  async deleteAndRevert(id: number, userId: number, isRevert: boolean = false, req?: any): Promise<void> {
+    const connection = await this.getPool(req).getConnection();
     try {
       await connection.beginTransaction();
       
       // Check if the log exists
-      const log = await this.findById(id);
+      const log = await this.findById(id, req);
       if (!log) {
         throw ERRORS.AUDIT_LOG_NOT_FOUND;
       }
@@ -266,7 +270,7 @@ export class AuditLogRepository {
         switch (log.action) {
           case 'create':
             // If the log was for a creation, delete the entry
-            await inventoryEntryRepository.delete(log.entry_id);
+            await inventoryEntryRepository.delete(log.entry_id, req);
             break;
             
           case 'update':
@@ -276,7 +280,7 @@ export class AuditLogRepository {
                 ? JSON.parse(log.old_data) 
                 : log.old_data;
                 
-              await inventoryEntryRepository.update(log.entry_id, oldData);
+              await inventoryEntryRepository.update(log.entry_id, oldData, req);
             }
             break;
             
@@ -288,7 +292,7 @@ export class AuditLogRepository {
                 : log.old_data;
                 
               // Need to recreate the entry with the old data
-              await inventoryEntryRepository.create(oldData as InventoryEntryCreateParams);
+              await inventoryEntryRepository.create(oldData as InventoryEntryCreateParams, req);
             }
             break;
         }
@@ -322,14 +326,15 @@ export class AuditLogRepository {
   async findByEntryId(
     entryId: number,
     page: number = 1, 
-    limit: number = 10
+    limit: number = 10,
+    req?: any
   ): Promise<{ logs: AuditLog[], total: number }> {
     try {
       return await this.findAll({
         entry_id: entryId,
         page,
         limit
-      });
+      }, req);
     } catch (error) {
       console.error(`Error finding audit logs for entry ${entryId}:`, error);
       throw ERRORS.DATABASE_ERROR;
@@ -343,7 +348,8 @@ export class AuditLogRepository {
     entryId: number, 
     newData: any, 
     userId: number, 
-    reason?: string
+    reason?: string,
+    req?: any
   ): Promise<AuditLog> {
     try {
       return await this.create({
@@ -352,7 +358,7 @@ export class AuditLogRepository {
         new_data: newData,
         user_id: userId,
         reason
-      });
+      }, req);
     } catch (error) {
       console.error(`Error logging create for entry ${entryId}:`, error);
       throw ERRORS.AUDIT_LOG_CREATION_FAILED;
@@ -367,7 +373,8 @@ export class AuditLogRepository {
     oldData: any, 
     newData: any, 
     userId: number, 
-    reason?: string
+    reason?: string,
+    req?: any
   ): Promise<AuditLog> {
     try {
       return await this.create({
@@ -377,7 +384,7 @@ export class AuditLogRepository {
         new_data: newData,
         user_id: userId,
         reason
-      });
+      }, req);
     } catch (error) {
       console.error(`Error logging update for entry ${entryId}:`, error);
       throw ERRORS.AUDIT_LOG_CREATION_FAILED;
@@ -391,7 +398,8 @@ export class AuditLogRepository {
     entryId: number, 
     oldData: any, 
     userId: number, 
-    reason?: string
+    reason?: string,
+    req?: any
   ): Promise<AuditLog> {
     try {
       return await this.create({
@@ -400,7 +408,7 @@ export class AuditLogRepository {
         old_data: oldData,
         user_id: userId,
         reason
-      });
+      }, req);
     } catch (error) {
       console.error(`Error logging delete for entry ${entryId}:`, error);
       throw ERRORS.AUDIT_LOG_CREATION_FAILED;
@@ -410,10 +418,10 @@ export class AuditLogRepository {
   /**
    * Updates the flag status of an audit log
    */
-  async updateFlag(id: number, isFlag: boolean): Promise<AuditLog> {
+  async updateFlag(id: number, isFlag: boolean, req?: any): Promise<AuditLog> {
     try {
       // First update the flag
-      const [result] = await db.execute<ResultSetHeader>(
+      const [result] = await this.getPool(req).execute<ResultSetHeader>(
         'UPDATE AuditLogs SET is_flag = ? WHERE id = ?',
         [isFlag, id]
       );
@@ -423,7 +431,7 @@ export class AuditLogRepository {
       }
 
       // Then fetch and return the updated audit log
-      const updatedLog = await this.findById(id);
+      const updatedLog = await this.findById(id, req);
       if (!updatedLog) {
         throw ERRORS.AUDIT_LOG_NOT_FOUND;
       }

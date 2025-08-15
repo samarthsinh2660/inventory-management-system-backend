@@ -14,9 +14,9 @@ export const getAllPurchaseInfos = async (req: Request, res: Response, next: Nex
     let purchaseInfos;
     
     if (search) {
-      purchaseInfos = await purchaseInfoRepository.searchPurchaseInfos(search as string);
+      purchaseInfos = await purchaseInfoRepository.searchPurchaseInfos(search as string, req);
     } else {
-      purchaseInfos = await purchaseInfoRepository.getAllPurchaseInfos();
+      purchaseInfos = await purchaseInfoRepository.getAllPurchaseInfos(req);
     }
     
     const message = search 
@@ -40,7 +40,7 @@ export const getPurchaseInfoById = async (req: Request, res: Response, next: Nex
       throw ERRORS.INVALID_PARAMS;
     }
     
-    const purchaseInfo = await purchaseInfoRepository.findById(purchaseInfoId);
+    const purchaseInfo = await purchaseInfoRepository.findById(purchaseInfoId, req);
     
     if (!purchaseInfo) {
       throw ERRORS.RESOURCE_NOT_FOUND;
@@ -64,12 +64,12 @@ export const getProductsByPurchaseInfo = async (req: Request, res: Response, nex
     }
     
     // Check if purchase info exists
-    const purchaseInfo = await purchaseInfoRepository.findById(purchaseInfoId);
+    const purchaseInfo = await purchaseInfoRepository.findById(purchaseInfoId, req);
     if (!purchaseInfo) {
       throw ERRORS.RESOURCE_NOT_FOUND;
     }
     
-    const products = await purchaseInfoRepository.getProductsByPurchaseInfo(purchaseInfoId);
+    const products = await purchaseInfoRepository.getProductsByPurchaseInfo(purchaseInfoId, req);
     
     res.json(listResponse(products, `Products for purchase info '${purchaseInfo.business_name}' retrieved successfully`));
   } catch (error: unknown) {
@@ -100,7 +100,7 @@ export const createPurchaseInfo = async (req: Request, res: Response, next: Next
     }
     
     // Check for duplicate business name
-    const existingPurchaseInfo = await purchaseInfoRepository.findByBusinessName(business_name);
+    const existingPurchaseInfo = await purchaseInfoRepository.findByBusinessName(business_name, req);
     if (existingPurchaseInfo) {
       throw ERRORS.DUPLICATE_RESOURCE;
     }
@@ -113,7 +113,7 @@ export const createPurchaseInfo = async (req: Request, res: Response, next: Next
         email,
         gst_number
       };
-      const purchaseInfo = await purchaseInfoRepository.create(purchaseInfoData);
+      const purchaseInfo = await purchaseInfoRepository.create(purchaseInfoData, req);
       
       res.status(201).json(createdResponse(purchaseInfo, 'Purchase info created successfully'));
     } catch (error: unknown) {
@@ -154,14 +154,14 @@ export const updatePurchaseInfo = async (req: Request, res: Response, next: Next
     }
     
     // Check if purchase info exists
-    const existingPurchaseInfo = await purchaseInfoRepository.findById(purchaseInfoId);
+    const existingPurchaseInfo = await purchaseInfoRepository.findById(purchaseInfoId, req);
     if (!existingPurchaseInfo) {
       throw ERRORS.RESOURCE_NOT_FOUND;
     }
     
     // Check for duplicate business name if name is being changed
     if (business_name && business_name !== existingPurchaseInfo.business_name) {
-      const duplicatePurchaseInfo = await purchaseInfoRepository.findByBusinessName(business_name);
+      const duplicatePurchaseInfo = await purchaseInfoRepository.findByBusinessName(business_name, req);
       if (duplicatePurchaseInfo) {
         throw ERRORS.DUPLICATE_RESOURCE;
       }
@@ -175,7 +175,7 @@ export const updatePurchaseInfo = async (req: Request, res: Response, next: Next
       if (email !== undefined) purchaseInfoData.email = email;
       if (gst_number !== undefined) purchaseInfoData.gst_number = gst_number;
       
-      const updatedPurchaseInfo = await purchaseInfoRepository.update(purchaseInfoId, purchaseInfoData);
+      const updatedPurchaseInfo = await purchaseInfoRepository.update(purchaseInfoId, purchaseInfoData, req);
       
       res.json(updatedResponse(updatedPurchaseInfo, 'Purchase info updated successfully'));
     } catch (error: unknown) {
@@ -198,13 +198,13 @@ export const deletePurchaseInfo = async (req: Request, res: Response, next: Next
     }
     
     // Check if purchase info exists
-    const purchaseInfo = await purchaseInfoRepository.findById(purchaseInfoId);
+    const purchaseInfo = await purchaseInfoRepository.findById(purchaseInfoId, req);
     if (!purchaseInfo) {
       throw ERRORS.RESOURCE_NOT_FOUND;
     }
     
     try {
-      await purchaseInfoRepository.deletePurchaseInfo(purchaseInfoId);
+      await purchaseInfoRepository.deletePurchaseInfo(purchaseInfoId, req);
       
       res.json(deletedResponse('Purchase info deleted successfully'));
     } catch (error: unknown) {

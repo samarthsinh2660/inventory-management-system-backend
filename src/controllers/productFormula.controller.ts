@@ -11,7 +11,7 @@ import { FormulaComponentData, ProductFormulaCreateParams, ProductFormulaUpdateP
  */
 export const getAllFormulas = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const formulas = await productFormulaRepository.getAllFormulas();
+    const formulas = await productFormulaRepository.getAllFormulas(req);
     res.json(listResponse(formulas, 'Product formulas retrieved successfully'));
   } catch (error: unknown) {
     next(error);
@@ -29,7 +29,7 @@ export const getFormulaById = async (req: Request, res: Response, next: NextFunc
       throw ERRORS.INVALID_PARAMS;
     }
     
-    const formula = await productFormulaRepository.findById(formulaId);
+    const formula = await productFormulaRepository.findById(formulaId, req);
     
     if (!formula) {
       throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
@@ -53,12 +53,12 @@ export const getProductsByFormulaId = async (req: Request, res: Response, next: 
     }
     
     // Check if formula exists
-    const formula = await productFormulaRepository.findById(formulaId);
+    const formula = await productFormulaRepository.findById(formulaId, req);
     if (!formula) {
       throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
     }
     
-    const products = await productFormulaRepository.getProductsUsingFormula(formulaId);
+    const products = await productFormulaRepository.getProductsUsingFormula(formulaId, req);
     
     res.json(listResponse(products, 'Products using formula retrieved successfully'));
   } catch (error: unknown) {
@@ -93,7 +93,7 @@ export const createFormula = async (req: Request, res: Response, next: NextFunct
       }
       
       // Check if component product exists
-      const componentProduct = await productRepository.findById(Number(component.component_id));
+      const componentProduct = await productRepository.findById(Number(component.component_id), req);
       if (!componentProduct) {
         throw ERRORS.FORMULA_COMPONENT_NOT_FOUND;
       }
@@ -110,7 +110,7 @@ export const createFormula = async (req: Request, res: Response, next: NextFunct
         }))
       };
       
-      const formula = await productFormulaRepository.create(formulaData);
+      const formula = await productFormulaRepository.create(formulaData,req);
       
       res.status(201).json(createdResponse(formula, 'Product formula created successfully'));
     } catch (error: unknown) {
@@ -134,7 +134,7 @@ export const updateFormula = async (req: Request, res: Response, next: NextFunct
     }
     
     // Check if formula exists
-    const existingFormula = await productFormulaRepository.findById(formulaId);
+    const existingFormula = await productFormulaRepository.findById(formulaId, req);
     if (!existingFormula) {
       throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
     }
@@ -155,7 +155,7 @@ export const updateFormula = async (req: Request, res: Response, next: NextFunct
         }
         
         // Check if component product exists
-        const componentProduct = await productRepository.findById(Number(component.component_id));
+        const componentProduct = await productRepository.findById(Number(component.component_id), req);
         if (!componentProduct) {
           throw ERRORS.PRODUCT_NOT_FOUND;
         }
@@ -181,7 +181,7 @@ export const updateFormula = async (req: Request, res: Response, next: NextFunct
         }));
       }
       
-      const updatedFormula = await productFormulaRepository.update(formulaId, updateData);
+      const updatedFormula = await productFormulaRepository.update(formulaId, updateData, req);
       
       res.json(updatedResponse(updatedFormula, 'Product formula updated successfully'));
     } catch (error: unknown) {
@@ -204,13 +204,13 @@ export const deleteFormula = async (req: Request, res: Response, next: NextFunct
     }
     
     // Check if formula exists
-    const formula = await productFormulaRepository.findById(formulaId);
+    const formula = await productFormulaRepository.findById(formulaId, req);
     if (!formula) {
       throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
     }
     
     try {
-      await productFormulaRepository.delete(formulaId);
+      await productFormulaRepository.delete(formulaId,req);
       
       res.json(deletedResponse('Product formula deleted successfully'));
     } catch (error: unknown) {
@@ -247,13 +247,13 @@ export const updateFormulaComponent = async (req: Request, res: Response, next: 
     }
     
     // Check if formula exists
-    const formula = await productFormulaRepository.findById(formulaId);
+    const formula = await productFormulaRepository.findById(formulaId, req);
     if (!formula) {
       throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
     }
     
     // Check if component product exists
-    const componentProduct = await productRepository.findById(Number(component_id));
+    const componentProduct = await productRepository.findById(Number(component_id),req);
     if (!componentProduct) {
       throw ERRORS.PRODUCT_NOT_FOUND;
     }
@@ -265,7 +265,7 @@ export const updateFormulaComponent = async (req: Request, res: Response, next: 
         quantity: Number(quantity)
       };
       
-      const updatedFormula = await productFormulaRepository.updateFormulaComponent(formulaId, componentData);
+      const updatedFormula = await productFormulaRepository.updateFormulaComponent(formulaId, componentData, req);
       
       res.json(updatedResponse(updatedFormula, 'Formula component updated successfully'));
     } catch (error: unknown) {
@@ -289,13 +289,13 @@ export const removeFormulaComponent = async (req: Request, res: Response, next: 
     }
     
     // Check if formula exists
-    const formula = await productFormulaRepository.findById(formulaId);
+    const formula = await productFormulaRepository.findById(formulaId, req);
     if (!formula) {
       throw ERRORS.PRODUCT_FORMULA_NOT_FOUND;
     }
     
     try {
-      const updatedFormula = await productFormulaRepository.removeFormulaComponent(formulaId, componentId);
+      const updatedFormula = await productFormulaRepository.removeFormulaComponent(formulaId, componentId, req);
       
       res.json(updatedResponse(updatedFormula, 'Formula component removed successfully'));
     } catch (error: unknown) {
