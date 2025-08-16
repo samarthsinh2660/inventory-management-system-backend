@@ -5,6 +5,7 @@ import { PORT, CORS_ORIGIN, CORS_ORIGIN1, CORS_ORIGIN2, CORS_ORIGIN3, CORS_ORIGI
 import cookieParser from "cookie-parser";
 import { connectToDatabase, gracefulShutdown } from "./database/db.ts";
 import { limiter } from "./middleware/ratelimit.middleware.ts";
+import createLogger from "./utils/logger.js";
 import LoginRouter from "./routes/auth.route.ts";
 import UserRouter from "./routes/user.route.ts";
 import SubcategoryRouter from "./routes/subcategory.route.ts";
@@ -20,6 +21,8 @@ import factoryRegistrationRoutes from './routes/factoryRegistration.route.js';
 import BackupRouter from "./routes/backup.route.ts";
 import { backupService } from "./services/backup.service.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware.ts";
+
+const logger = createLogger('@app');
 
 async function start(){
 // Setup crash handlers first
@@ -81,6 +84,7 @@ app.listen(PORT, async () => {
     
     // Start the backup scheduler
     console.log(`🔄 Starting backup scheduler...`);
+    logger.info(`🔄 Starting backup scheduler...`);
     backupService.startBackupScheduler();
     
     console.log(`Server started on port ${PORT}`);
@@ -95,10 +99,10 @@ const gracefulShutdownHandler = async (signal: string) => {
     
     try {
         await gracefulShutdown();
-        console.log("✅ Graceful shutdown completed");
+        logger.info("Graceful shutdown completed");
         process.exit(0);
     } catch (error) {
-        console.error("❌ Error during shutdown:", error);
+        logger.error(`Error during shutdown: ${error}`);
         process.exit(1);
     }
 };

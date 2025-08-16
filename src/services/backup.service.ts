@@ -3,12 +3,19 @@ import { exec } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { promisify } from 'util';
-import { MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, BACKUP_RETENTION_DAYS } from '../config/env.ts';
+import { MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, BACKUP_RETENTION_DAYS, BACKUP_BASE_NAME, AZURE_STORAGE_ACCOUNT_NAME, AZURE_STORAGE_ACCOUNT_KEY, AZURE_STORAGE_CONTAINER_NAME, AZURE_BACKUP_ENABLED } from '../config/env.ts';
+import createLogger from '../utils/logger.js';
 
 const execAsync = promisify(exec);
+const logger = createLogger('@backup');
 
 export class BackupService {
     private backupDir: string;
+    private baseName: string;
+    private azureEnabled: boolean;
+    private azureAccountName?: string;
+    private azureAccountKey?: string;
+    private azureContainerName: string;
     private mysqlHost: string;
     private mysqlPort: number;
     private mysqlUser: string;
@@ -22,34 +29,43 @@ export class BackupService {
         try {
             if (!fs.existsSync(this.backupDir)) {
                 fs.mkdirSync(this.backupDir, { recursive: true });
-                console.log(`✅ Created backup directory: ${this.backupDir}`);
+                logger.info(`Created backup directory: ${this.backupDir}`);
             } else {
-                console.log(`📁 Backup directory exists: ${this.backupDir}`);
+                logger.info(`Backup directory exists: ${this.backupDir}`);
             }
             
             // Test write permissions
             const testFile = path.join(this.backupDir, '.write-test');
             fs.writeFileSync(testFile, 'test');
             fs.unlinkSync(testFile);
-            console.log(`✅ Backup directory is writable`);
+            logger.info(`Backup directory is writable`);
             
         } catch (error) {
-            console.error(`❌ Failed to setup backup directory:`, error);
+            logger.error(`Failed to setup backup directory: ${error}`);
             throw new Error(`Backup directory setup failed: ${error}`);
         }
 
         // MySQL configuration from centralized env (no inline defaults here)
         this.mysqlHost = MYSQL_HOST as string;
+        this.baseName = BACKUP_BASE_NAME || 'multi_tenant_backup';
+        this.azureEnabled = AZURE_BACKUP_ENABLED || false;
+        this.azureAccountName = AZURE_STORAGE_ACCOUNT_NAME;
+        this.azureAccountKey = AZURE_STORAGE_ACCOUNT_KEY;
+        this.azureContainerName = AZURE_STORAGE_CONTAINER_NAME || 'backups';
         this.mysqlPort = MYSQL_PORT as number;
         this.mysqlUser = MYSQL_USER as string;
         this.mysqlPassword = MYSQL_PASSWORD as string;
         this.retentionDays = BACKUP_RETENTION_DAYS as number;
 
-        console.log(`🔧 Backup Service Configuration:`);
-        console.log(`   - Host: ${this.mysqlHost}:${this.mysqlPort}`);
-        console.log(`   - User: ${this.mysqlUser}`);
-        console.log(`   - Backup Directory: ${this.backupDir}`);
-        console.log(`   - Retention: ${this.retentionDays} days`);
+        logger.info(`Backup Service Configuration:`);
+        logger.info(`   - Host: ${this.mysqlHost}:${this.mysqlPort}`);
+        logger.info(`   - Base Name: ${this.baseName}`);
+        logger.info(`   - Azure Backup: ${this.azureEnabled ? 'Enabled' : 'Disabled'}`);
+        if (this.azureEnabled) {
+            logger.info(`   - Azure Container: ${this.azureContainerName}`);
+        }
+        logger.info(`   - Backup Directory: ${this.backupDir}`);
+        logger.info(`   - Retention: ${this.retentionDays} days`);
     }
 
     /**
@@ -58,20 +74,20 @@ export class BackupService {
     public startBackupScheduler(): void {
         // Schedule backup every 4 hours at minute 0: "0 */4 * * *"
         cron.schedule('0 */4 * * *', async () => {
-            console.log(`🔄 Starting scheduled backup at ${new Date().toISOString()}`);
+            logger.info(`Starting scheduled backup at ${new Date().toISOString()}`);
             await this.performBackup();
         });
 
         // Schedule cleanup daily at 2 AM: "0 2 * * *"
         cron.schedule('0 2 * * *', async () => {
-            console.log(`🧹 Starting scheduled cleanup at ${new Date().toISOString()}`);
+            logger.info(`Starting scheduled cleanup at ${new Date().toISOString()}`);
             await this.cleanupOldBackups();
         });
 
-        console.log(`✅ Backup scheduler started:`);
-        console.log(`   - Backup: Every 4 hours`);
-        console.log(`   - Cleanup: Daily at 2 AM`);
-        console.log(`   - Retention: ${this.retentionDays} days`);
+        logger.info(`Backup scheduler started:`);
+        logger.info(`   - Backup: Every 4 hours`);
+        logger.info(`   - Cleanup: Daily at 2 AM`);
+        logger.info(`   - Retention: ${this.retentionDays} days`);
     }
 
     /**
@@ -85,10 +101,10 @@ export class BackupService {
                 .replace(/:/g, '-')
                 .replace(/\..+/, '');
             
-            const backupFileName = `multi_tenant_backup_${timestamp}.sql`;
+            const backupFileName = `${this.baseName}_${timestamp}.sql`;
             const backupFilePath = path.join(this.backupDir, backupFileName);
 
-            console.log(`📦 Creating backup: ${backupFileName}`);
+            logger.info(`Creating backup: ${backupFileName}`);
 
             // Direct MySQL dump command (works from within Docker container)
             const dumpCommand = `mysqldump -h${this.mysqlHost} -P${this.mysqlPort} -u${this.mysqlUser} -p${this.mysqlPassword} --all-databases --routines --triggers --single-transaction`;
@@ -109,56 +125,140 @@ export class BackupService {
             const stats = fs.statSync(backupFilePath);
             const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
 
-            console.log(`✅ Backup completed successfully:`);
-            console.log(`   - File: ${backupFileName}`);
-            console.log(`   - Size: ${fileSizeMB} MB`);
-            console.log(`   - Path: ${backupFilePath}`);
+            logger.info(`Backup completed successfully:`);
+            logger.info(`   - File: ${backupFileName}`);
+            logger.info(`   - Size: ${fileSizeMB} MB`);
+            logger.info(`   - Path: ${backupFilePath}`);
+
+            // Upload to Azure Blob Storage (primary storage)
+            if (this.azureEnabled) {
+                await this.uploadToAzure(backupFilePath, backupFileName);
+                // Remove local file after successful Azure upload
+                try {
+                    fs.unlinkSync(backupFilePath);
+                    logger.info(`Removed local backup file: ${backupFileName}`);
+                } catch (unlinkErr) {
+                    logger.warn(`Could not remove local file: ${unlinkErr}`);
+                }
+            }
 
             return backupFilePath;
 
         } catch (error) {
-            console.error(`❌ Backup failed:`, error);
+            logger.error(`Backup failed: ${error}`);
             return null;
         }
     }
 
     /**
-     * Clean up backups older than retention period
+     * Upload backup file to Azure Blob Storage
+     */
+    private async uploadToAzure(filePath: string, fileName: string): Promise<void> {
+        try {
+            if (!this.azureAccountName || !this.azureAccountKey) {
+                throw new Error('Azure Storage account name and key not configured');
+            }
+
+            // Dynamic import to handle optional dependency
+            const { BlobServiceClient, StorageSharedKeyCredential } = await import('@azure/storage-blob');
+            
+            const credential = new StorageSharedKeyCredential(this.azureAccountName, this.azureAccountKey);
+            const blobServiceClient = new BlobServiceClient(
+                `https://${this.azureAccountName}.blob.core.windows.net`,
+                credential
+            );
+            const containerClient = blobServiceClient.getContainerClient(this.azureContainerName);
+            
+            // Ensure container exists
+            await containerClient.createIfNotExists();
+
+            const blockBlobClient = containerClient.getBlockBlobClient(fileName);
+            
+            logger.info(`Uploading to Azure: ${fileName}`);
+            
+            // Upload file
+            await blockBlobClient.uploadFile(filePath);
+            
+            logger.info(`Azure upload completed: ${fileName}`);
+            
+        } catch (error) {
+            logger.error(`Azure upload failed for ${fileName}: ${error}`);
+            // Don't throw - backup should continue even if Azure upload fails
+        }
+    }
+
+    /**
+     * Clean up Azure backups older than retention period (preserves current day files)
      */
     public async cleanupOldBackups(): Promise<void> {
         try {
-            const files = fs.readdirSync(this.backupDir);
+            if (!this.azureEnabled) {
+                logger.warn(`Azure backup not enabled, skipping cleanup`);
+                return;
+            }
+
+            if (!this.azureAccountName || !this.azureAccountKey) {
+                logger.error(`Azure credentials not configured for cleanup`);
+                return;
+            }
+
+            // Dynamic import to handle optional dependency
+            const { BlobServiceClient, StorageSharedKeyCredential } = await import('@azure/storage-blob');
+            
+            const credential = new StorageSharedKeyCredential(this.azureAccountName, this.azureAccountKey);
+            const blobServiceClient = new BlobServiceClient(
+                `https://${this.azureAccountName}.blob.core.windows.net`,
+                credential
+            );
+            const containerClient = blobServiceClient.getContainerClient(this.azureContainerName);
+
             const cutoffDate = new Date();
             cutoffDate.setDate(cutoffDate.getDate() - this.retentionDays);
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Start of current day
 
             let deletedCount = 0;
             let totalSize = 0;
 
-            for (const file of files) {
-                if (!file.endsWith('.sql')) continue;
+            logger.info(`Starting Azure backup cleanup (retention: ${this.retentionDays} days)`);
 
-                const filePath = path.join(this.backupDir, file);
-                const stats = fs.statSync(filePath);
+            // List all blobs in the container
+            for await (const blob of containerClient.listBlobsFlat()) {
+                if (!blob.name.endsWith('.sql')) continue;
 
-                if (stats.mtime < cutoffDate) {
-                    totalSize += stats.size;
-                    fs.unlinkSync(filePath);
-                    deletedCount++;
-                    console.log(`🗑️ Deleted old backup: ${file}`);
+                const blobDate = new Date(blob.properties.lastModified!);
+                const blobDateOnly = new Date(blobDate);
+                blobDateOnly.setHours(0, 0, 0, 0); // Start of blob's day
+
+                // Only delete files that are both older than cutoff AND not from today
+                if (blob.properties.lastModified! < cutoffDate && blobDateOnly.getTime() !== today.getTime()) {
+                    try {
+                        const blobClient = containerClient.getBlobClient(blob.name);
+                        await blobClient.delete();
+                        
+                        totalSize += blob.properties.contentLength || 0;
+                        deletedCount++;
+                        logger.info(`Deleted Azure backup: ${blob.name}`);
+                    } catch (deleteErr) {
+                        logger.error(`Failed to delete ${blob.name}: ${deleteErr}`);
+                    }
+                } else if (blobDateOnly.getTime() === today.getTime()) {
+                    logger.info(`Preserving current day backup: ${blob.name}`);
                 }
             }
 
             if (deletedCount > 0) {
                 const freedSpaceMB = (totalSize / (1024 * 1024)).toFixed(2);
-                console.log(`✅ Cleanup completed:`);
-                console.log(`   - Files deleted: ${deletedCount}`);
-                console.log(`   - Space freed: ${freedSpaceMB} MB`);
+                logger.info(`Azure cleanup completed:`);
+                logger.info(`   - Files deleted: ${deletedCount}`);
+                logger.info(`   - Space freed: ${freedSpaceMB} MB`);
             } else {
-                console.log(`✅ No old backups to clean up`);
+                logger.info(`No old Azure backups to clean up`);
             }
 
         } catch (error) {
-            console.error(`❌ Cleanup failed:`, error);
+            logger.error(`Azure cleanup failed: ${error}`);
         }
     }
 
@@ -195,7 +295,7 @@ export class BackupService {
             };
 
         } catch (error) {
-            console.error('Error getting backup stats:', error);
+            logger.error(`Error getting backup stats: ${error}`);
             return {
                 totalBackups: 0,
                 totalSizeMB: 0,
@@ -209,12 +309,12 @@ export class BackupService {
      * Manual backup trigger (for testing or manual backups)
      */
     public async triggerManualBackup(): Promise<void> {
-        console.log(`🔧 Manual backup triggered at ${new Date().toISOString()}`);
+        logger.info(`Manual backup triggered at ${new Date().toISOString()}`);
         const result = await this.performBackup();
         if (result) {
-            console.log(`✅ Manual backup completed: ${result}`);
+            logger.info(`Manual backup completed: ${result}`);
         } else {
-            console.log(`❌ Manual backup failed`);
+            logger.error(`Manual backup failed`);
         }
     }
 
@@ -222,7 +322,7 @@ export class BackupService {
      * Manual cleanup trigger
      */
     public async triggerManualCleanup(): Promise<void> {
-        console.log(`🔧 Manual cleanup triggered at ${new Date().toISOString()}`);
+        logger.info(`Manual cleanup triggered at ${new Date().toISOString()}`);
         await this.cleanupOldBackups();
     }
 }

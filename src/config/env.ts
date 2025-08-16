@@ -19,6 +19,15 @@ export const PORT = process.env.PORT;
 export const NODE_ENV = process.env.NODE_ENV;
 export const SERVER_URL = process.env.SERVER_URL;
 
+// Base file name used for backups (e.g., multi_tenant_backup)
+export const BACKUP_BASE_NAME = process.env.BACKUP_BASE_NAME || 'multi_tenant_backup';
+
+// Azure Blob Storage configuration
+export const AZURE_STORAGE_ACCOUNT_NAME = process.env.AZURE_STORAGE_ACCOUNT_NAME;
+export const AZURE_STORAGE_ACCOUNT_KEY = process.env.AZURE_STORAGE_ACCOUNT_KEY;
+export const AZURE_STORAGE_CONTAINER_NAME = process.env.AZURE_STORAGE_CONTAINER_NAME || 'database-backups';
+export const AZURE_BACKUP_ENABLED = process.env.AZURE_BACKUP_ENABLED === 'true';
+
 export const DB_HOST = process.env.DB_HOST!;
 export const DB_USER = process.env.DB_USER!;
 export const DB_PASSWORD = process.env.DB_PASSWORD!;

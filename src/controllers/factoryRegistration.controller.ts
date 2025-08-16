@@ -4,6 +4,9 @@ import { FactoryCreateParams } from '../models/factory.model.js';
 import { ConnectionSyncService } from '../services/connectionSync.service.js';
 import bcrypt from 'bcrypt';
 import { TENANT_DB_ADMIN_USER, TENANT_DB_ADMIN_PASSWORD , DB_HOST, DB_PORT } from '../config/env.js';
+import createLogger from "../utils/logger.js";
+
+const logger = createLogger('@factoryRegistration');
 
 export class FactoryRegistrationController {
     private factoryRepository: FactoryRepository;
@@ -211,10 +214,10 @@ export class FactoryRegistrationController {
                 ]
             );
 
-            console.log(`Admin user created for factory database: ${dbName}`);
+            logger.info(`Admin user created for factory database: ${dbName}`);
 
         } catch (error) {
-            console.error(`Failed to create admin user for ${dbName}:`, error);
+            logger.error(`Failed to create admin user for ${dbName}:`, error);
             throw new Error(`Failed to create admin user: ${error}`);
         } finally {
             await connection.end();

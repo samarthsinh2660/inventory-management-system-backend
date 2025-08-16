@@ -1,6 +1,8 @@
 import { RowDataPacket, Pool } from 'mysql2/promise';
 import { User } from '../models/users.model.ts';
+import createLogger from "../utils/logger.js";
 
+const logger = createLogger('@alertService');
 // Interface for low stock products
 interface LowStockProduct {
   id: number;
@@ -57,7 +59,7 @@ class AlertService {
       const [products] = await tenantPool.execute<RowDataPacket[]>(query);
       return products as LowStockProduct[];
     } catch (error) {
-      console.error("Error getting products below threshold:", error);
+      logger.error("Error getting products below threshold:", error);
       return [];
     }
   }
@@ -73,7 +75,7 @@ class AlertService {
       );
       return users as User[];
     } catch (error) {
-      console.error("Error getting master users:", error);
+      logger.error("Error getting master users:", error);
       return [];
     }
   }
@@ -97,14 +99,14 @@ class AlertService {
       const masterUsers = await this.getMasterUsers(tenantPool);
       
       if (masterUsers.length === 0) {
-        console.warn("No master users found to notify about low stock");
+        logger.warn("No master users found to notify about low stock");
         return;
       }
       
       // Log alerts to console
-      console.log(`ALERT: ${lowStockProducts.length} products below minimum stock threshold`);
+      logger.info(`ALERT: ${lowStockProducts.length} products below minimum stock threshold`);
       lowStockProducts.forEach(product => {
-        console.log(`Product: ${product.name}, Current: ${product.current_stock}, Minimum: ${product.min_stock_threshold}, Location: ${product.location_name}`);
+        logger.info(`Product: ${product.name}, Current: ${product.current_stock}, Minimum: ${product.min_stock_threshold}, Location: ${product.location_name}`);
       });
       
       // Store alerts in the database for later retrieval via API
@@ -114,7 +116,7 @@ class AlertService {
       await this.createInAppNotifications(lowStockProducts, masterUsers, tenantPool);
       
     } catch (error) {
-      console.error("Error in checking and sending alerts:", error);
+      logger.error("Error in checking and sending alerts:", error);
     }
   }
 
@@ -152,7 +154,7 @@ class AlertService {
         }
       }
     } catch (error) {
-      console.error("Error storing stock alerts:", error);
+      logger.error("Error storing stock alerts:", error);
     }
   }
   
@@ -219,7 +221,7 @@ class AlertService {
         }
       }
     } catch (error) {
-      console.error("Error creating in-app notifications:", error);
+      logger.error("Error creating in-app notifications:", error);
     }
   }
   
@@ -240,7 +242,7 @@ class AlertService {
         .filter(productId => !currentLowStockProductIds.has(productId));
       
       if (productsToResolve.length > 0) {
-        console.log(`RESOLVED: ${productsToResolve.length} products are now above minimum threshold`);
+        logger.info(`RESOLVED: ${productsToResolve.length} products are now above minimum threshold`);
         
         // Resolve stock alerts for these products
         for (const productId of productsToResolve) {
@@ -265,12 +267,12 @@ class AlertService {
             [productId]
           );
           if (productInfo.length > 0) {
-            console.log(`Product: ${productInfo[0].name} - Alert resolved (stock refilled above threshold)`);
+            logger.info(`Product: ${productInfo[0].name} - Alert resolved (stock refilled above threshold)`);
           }
         }
       }
     } catch (error) {
-      console.error("Error resolving refilled alerts:", error);
+      logger.error("Error resolving refilled alerts:", error);
     }
   }
 

@@ -1,6 +1,9 @@
 import { FactoryRepository } from '../repositories/factory.repository.ts';
 import { UserRepository } from '../repositories/user.repository.ts';
 import { getFactoryPoolFromRequest } from '../middleware/auth.middleware.ts';
+import createLogger from "../utils/logger.js";
+
+const logger = createLogger('@connectionSyncService');
 
 export class ConnectionSyncService {
     private factoryRepository: FactoryRepository;
@@ -28,9 +31,9 @@ export class ConnectionSyncService {
             // Update max_connections in central database
             await this.factoryRepository.updateMaxConnections(dbName, newMaxConnections);
             
-            console.log(`✅ Synced connections for ${dbName}: ${userCount} users → ${newMaxConnections} max_connections`);
+            logger.info(`✅ Synced connections for ${dbName}: ${userCount} users → ${newMaxConnections} max_connections`);
         } catch (error) {
-            console.error(`❌ Failed to sync connections for ${dbName}:`, error);
+            logger.error(`❌ Failed to sync connections for ${dbName}:`, error);
             throw error;
         }
     }
@@ -54,14 +57,14 @@ export class ConnectionSyncService {
                     
                     await this.syncMaxConnections(factory.db_name, mockReq);
                 } catch (error) {
-                    console.error(`Failed to sync factory ${factory.factory_name}:`, error);
+                    logger.error(`Failed to sync factory ${factory.factory_name}:`, error);
                     // Continue with other factories even if one fails
                 }
             }
             
-            console.log(`✅ Completed connection sync for all factories`);
+            logger.info(`✅ Completed connection sync for all factories`);
         } catch (error) {
-            console.error('❌ Failed to sync all factories:', error);
+            logger.error('❌ Failed to sync all factories:', error);
             throw error;
         }
     }

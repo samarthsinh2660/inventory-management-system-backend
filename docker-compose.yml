@@ -1,48 +1,3 @@
-# services:
-#   mysql:
-#     image: mysql:8.4
-#     container_name: inventory-mysql_db
-#     restart: always
-#     environment:
-#       MYSQL_ROOT_PASSWORD: root
-#       MYSQL_DATABASE: inventory-management
-#       MYSQL_USER: user
-#       MYSQL_PASSWORD: password
-#     ports:
-#       - "3308:3306"
-#     volumes:
-#       - db_data:/var/lib/mysql
-#       - ./src/database/03-central_db.sql:/docker-entrypoint-initdb.d/01-central_db.sql
-#     healthcheck:
-#       test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost", "-u$${MYSQL_USER}", "-p$${MYSQL_PASSWORD}"]
-#       interval: 10s
-#       timeout: 5s
-#       retries: 5
-#       start_period: 30s
-
-#   app:
-#     build:
-#       context: .
-#       dockerfile: Dockerfile
-#     container_name: inventory-backend
-#     restart: on-failure
-#     depends_on:
-#       mysql:
-#         condition: service_healthy
-#     ports:
-#       - "3000:3000"
-#     environment:
-#       NODE_ENV: development
-#       NODE_NO_WARNINGS: 1
-#       DB_HOST: mysql
-#       DB_USER: user
-#       DB_PASSWORD: password
-#       DB_NAME: inventory-management
-#       DB_PORT: 3306
-#       PORT: 3000
-#     volumes:
-#       - ./src:/app/src
-#     command: ["npm","run","dev"]
 
 services:
   mysql_v2:
@@ -100,9 +55,7 @@ services:
       JWT_REFRESH_EXPIRES_IN: "7d"
     volumes:
       - ./src:/app/src
-      - ./db-backups:/app/db-backups
     command: ["npm","run","dev"]
 
 volumes:
-  # db_data:
   db_data_v2:

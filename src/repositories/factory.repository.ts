@@ -3,6 +3,9 @@ import { Factory, FactoryCreateParams, FactoryUpdateParams } from "../models/fac
 import { getCentralDB } from "../database/connectionManager.js";
 import fs from 'fs';
 import path from 'path';
+import createLogger from "../utils/logger.js";
+
+const logger = createLogger('@factoryRepository');
 
 export class FactoryRepository {
     private db: Pool;
@@ -201,7 +204,7 @@ export class FactoryRepository {
             'UPDATE factories SET max_connections = ?, updated_at = CURRENT_TIMESTAMP WHERE db_name = ?',
             [maxConnections, dbName]
         );
-        console.log(`Updated max_connections to ${maxConnections} for factory: ${dbName}`);
+        logger.info(`Updated max_connections to ${maxConnections} for factory: ${dbName}`);
     }
 
     // Get factory statistics
@@ -236,35 +239,35 @@ export class FactoryRepository {
         });
 
         try {
-            console.log(`Creating factory database: ${params.db_name}`);
+            logger.info(`Creating factory database: ${params.db_name}`);
             
             // Create the database
             await connection.execute(`CREATE DATABASE IF NOT EXISTS \`${params.db_name}\``);
-            console.log(`✅ Database ${params.db_name} created`);
+            logger.info(`✅ Database ${params.db_name} created`);
             
             // Use the new database
             // USE is not supported in prepared statement protocol; use query instead
             await connection.query(`USE \`${params.db_name}\``);
-            console.log(`✅ Switched to database ${params.db_name}`);
+            logger.info(`✅ Switched to database ${params.db_name}`);
 
             // Read and execute the table creation SQL
             const tablesSQL = await this.readSQLFile('01-tables.sql');
             if (tablesSQL) {
-                console.log(`✅ SQL file loaded, executing table creation...`);
+                logger.info(`✅ SQL file loaded, executing table creation...`);
                 // Execute multi-statement schema script using query to avoid PS limitations
                 await connection.query(tablesSQL);
-                console.log(`✅ Tables created successfully in ${params.db_name}`);
+                logger.info(`✅ Tables created successfully in ${params.db_name}`);
                 
                 // Verify tables were created
                 const [tables] = await connection.query('SHOW TABLES');
-                console.log(`✅ Tables in ${params.db_name}:`, tables);
+                logger.info(`✅ Tables in ${params.db_name}:`, tables);
             } else {
                 throw new Error('Failed to load 01-tables.sql file');
             }
 
-            console.log(`✅ Successfully created factory database: ${params.db_name}`);
+            logger.info(`✅ Successfully created factory database: ${params.db_name}`);
         } catch (error) {
-            console.error(`❌ Failed to create factory database ${params.db_name}:`, error);
+            logger.error(`❌ Failed to create factory database ${params.db_name}:`, error);
             throw new Error(`Failed to create factory database: ${error}`);
         } finally {
             await connection.end();
@@ -275,25 +278,25 @@ export class FactoryRepository {
     private async readSQLFile(filename: string): Promise<string | null> {
         try {
             const sqlPath = path.join(process.cwd(), 'src', 'database', filename);
-            console.log(`Looking for SQL file at: ${sqlPath}`);
+            logger.info(`Looking for SQL file at: ${sqlPath}`);
             
             if (fs.existsSync(sqlPath)) {
                 const content = fs.readFileSync(sqlPath, 'utf8');
-                console.log(`✅ SQL file loaded: ${filename} (${content.length} characters)`);
+                logger.info(`✅ SQL file loaded: ${filename} (${content.length} characters)`);
                 return content;
             }
             
-            console.error(`❌ SQL file not found: ${sqlPath}`);
+            logger.error(`❌ SQL file not found: ${sqlPath}`);
             // Try alternative paths
             const altPath1 = path.join(process.cwd(), 'database', filename);
             const altPath2 = path.join(__dirname, '..', 'database', filename);
-            console.log(`Trying alternative paths:`);
-            console.log(`  - ${altPath1}: ${fs.existsSync(altPath1) ? 'EXISTS' : 'NOT FOUND'}`);
-            console.log(`  - ${altPath2}: ${fs.existsSync(altPath2) ? 'EXISTS' : 'NOT FOUND'}`);
+            logger.info(`Trying alternative paths:`);
+            logger.info(`  - ${altPath1}: ${fs.existsSync(altPath1) ? 'EXISTS' : 'NOT FOUND'}`);
+            logger.info(`  - ${altPath2}: ${fs.existsSync(altPath2) ? 'EXISTS' : 'NOT FOUND'}`);
             
             return null;
         } catch (error) {
-            console.error(`❌ Error reading SQL file ${filename}:`, error);
+            logger.error(`❌ Error reading SQL file ${filename}:`, error);
             return null;
         }
     }

@@ -4,6 +4,9 @@ import { ERRORS } from '../utils/error.ts';
 import { getPoolByUsername } from '../database/connectionManager.ts';
 import { Pool } from 'mysql2/promise';
 import '../types/express.ts';
+import createLogger from '../utils/logger.js';
+
+const logger = createLogger('@auth');
 
 export const authenticate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -28,9 +31,8 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         try {
             (req as any).factoryPool = await getFactoryPoolFromRequest(req);
             (req as any).factoryDbName = decoded.factory_db;
-            console.log(`✅ Factory pool initialized for: ${decoded.factory_db}`);
         } catch (error) {
-            console.error(`❌ Failed to initialize factory pool for ${decoded.factory_db}:`, error);
+            logger.error(`❌ Failed to initialize factory pool for ${decoded.factory_db}:`, error);
             throw ERRORS.INVALID_AUTH_TOKEN;
         }
         

@@ -157,5 +157,5 @@ logs/
 .DS_Store
 Thumbs.db
 
-# # Test files
-# test_auth_api.sh
+#logs
+error.log

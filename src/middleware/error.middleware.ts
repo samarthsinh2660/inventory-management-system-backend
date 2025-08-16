@@ -2,6 +2,9 @@ import { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
 import { RequestError } from '../utils/error.ts';
 import { errorResponse } from '../utils/response.ts';
 import { NODE_ENV } from '../config/env.ts';
+import createLogger from '../utils/logger.js';
+
+const localLogger = createLogger('@error');
 
 export const errorHandler = (
     error: Error | RequestError,
@@ -9,9 +12,8 @@ export const errorHandler = (
     res: Response,
     next: NextFunction
 ): void => {
-  // Log error for debugging (in production, use proper logging service)
-  console.error('Error occurred:', {
-    message: error.message,
+  // Log error with structured logging
+  localLogger.error(`Error occurred: ${error.message}`, {
     stack: error.stack,
     url: req.url,
     method: req.method,
