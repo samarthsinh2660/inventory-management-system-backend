@@ -55,6 +55,7 @@ services:
       JWT_REFRESH_EXPIRES_IN: "7d"
     volumes:
       - ./src:/app/src
+      - ./logs:/app/logs
     command: ["npm","run","dev"]
 
 volumes:
