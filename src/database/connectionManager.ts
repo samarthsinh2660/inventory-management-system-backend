@@ -89,7 +89,7 @@ export const getFactoryPool = async (factory: Factory): Promise<Pool> => {
     }
     
     // Create new pool
-    logger.info(`🔄 Creating new pool for factory: ${factory.factory_name}`);
+   // logger.info(`🔄 Creating new pool for factory: ${factory.factory_name}`);
     
     const newPool = mysql.createPool({
         host: factory.db_host,
@@ -114,7 +114,7 @@ export const getFactoryPool = async (factory: Factory): Promise<Pool> => {
         
         // Cache the pool
         poolCache.set(poolKey, newPool);
-        logger.info(`✅ New pool created and cached for factory: ${factory.factory_name}`);
+       // logger.info(`✅ New pool created and cached for factory: ${factory.factory_name}`);
         
         return newPool;
     } catch (error) {
