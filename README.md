@@ -67,6 +67,16 @@ BACKUP_RETENTION_DAYS=7
 npm start
 ```
 
+### Logging setup
+
+- Create a `logs/` folder in the project root so file logging works and the Docker volume bind has a target. On Windows PowerShell:
+```powershell
+New-Item -ItemType Directory -Force .\logs | Out-Null
+```
+- File output locations:
+  - Local: `logs/error.log`
+  - In Docker container: `/app/logs/error.log`
+
 ---
 
 ## Docker Quickstart (Optional)
