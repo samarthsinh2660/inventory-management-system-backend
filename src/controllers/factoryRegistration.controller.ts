@@ -117,7 +117,7 @@ export class FactoryRegistrationController {
                 },
                 download_info: {
                     message: 'Your factory database has been created. You can now download the app and login with the credentials above.',
-                    app_download_url: 'https://your-app-download-url.com'  // Replace with your actual download URL
+                    app_download_url: 'https://drive.google.com/uc?export=download&id=1EluGAG6ZaEWgefIESP7ddGa5RRA_b_jW'  // Replace with your actual download URL
                 }
             });
 
