@@ -83,19 +83,22 @@ app.listen(PORT, async () => {
     await connectToDatabase();
     
     // Start the backup scheduler
-    console.log(`🔄 Starting backup scheduler...`);
     logger.info(`🔄 Starting backup scheduler...`);
     backupService.startBackupScheduler();
     
+    logger.info(`Server started on port ${PORT}`);
     console.log(`Server started on port ${PORT}`);
+    logger.info(`🏭 Factory registration available at: http://localhost:${PORT}/api/factory`);
     console.log(`🏭 Factory registration available at: http://localhost:${PORT}/api/factory`);
+    logger.info(`💾 Backup management available at: http://localhost:${PORT}/api/backup`);
     console.log(`💾 Backup management available at: http://localhost:${PORT}/api/backup`);
+    logger.info(`📈 Health check: http://localhost:${PORT}/health`);
     console.log(`📈 Health check: http://localhost:${PORT}/health`);
 })
 
 // Graceful shutdown handling for multi-tenant system
 const gracefulShutdownHandler = async (signal: string) => {
-    console.log(`\n🔄 Received ${signal}. Starting graceful shutdown...`);
+    logger.info(`\n🔄 Received ${signal}. Starting graceful shutdown...`);
     
     try {
         await gracefulShutdown();

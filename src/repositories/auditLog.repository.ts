@@ -5,7 +5,9 @@ import { ERRORS } from "../utils/error.ts";
 import { AuditLog, AuditLogCreateParams, AuditLogFilter, AuditLogFilters, FilteredAuditLogsResponse } from "../models/auditLogs.model.ts";
 import inventoryEntryRepository from "./inventoryEntry.repository.ts";
 import { InventoryEntryCreateParams } from "../models/inventoryEntries.model.ts";
+import createLogger from '../utils/logger.ts';
 
+const logger = createLogger('@auditLogRepository');
 export class AuditLogRepository {
   private getPool(req?: any): Pool {
     return req?.factoryPool || db;
@@ -197,7 +199,7 @@ export class AuditLogRepository {
         filters_applied: filtersApplied 
       };
     } catch (error) {
-      console.error("Error finding audit logs with filters:", error);
+      logger.error("Error finding audit logs with filters:", error);
       throw ERRORS.AUDIT_LOG_FILTER_SEARCH_FAILED;
     }
   }
@@ -216,7 +218,7 @@ export class AuditLogRepository {
       
       return logs.length > 0 ? logs[0] : null;
     } catch (error) {
-      console.error(`Error finding audit log with id ${id}:`, error);
+      logger.error(`Error finding audit log with id ${id}:`, error);
       throw ERRORS.DATABASE_ERROR;
     }
   }
@@ -245,7 +247,7 @@ export class AuditLogRepository {
       // Return the created log
       return await this.findById(logId, req) as AuditLog;
     } catch (error) {
-      console.error("Error creating audit log:", error);
+      logger.error("Error creating audit log:", error);
       throw ERRORS.AUDIT_LOG_CREATION_FAILED;
     }
   }
@@ -304,7 +306,7 @@ export class AuditLogRepository {
       await connection.commit();
     } catch (error) {
       await connection.rollback();
-      console.error(`Error deleting/reverting audit log with id ${id}:`, error);
+      logger.error(`Error deleting/reverting audit log with id ${id}:`, error);
       
       if (error === ERRORS.AUDIT_LOG_NOT_FOUND) {
         throw error;
@@ -336,7 +338,7 @@ export class AuditLogRepository {
         limit
       }, req);
     } catch (error) {
-      console.error(`Error finding audit logs for entry ${entryId}:`, error);
+      logger.error(`Error finding audit logs for entry ${entryId}:`, error);
       throw ERRORS.DATABASE_ERROR;
     }
   }
@@ -360,7 +362,7 @@ export class AuditLogRepository {
         reason
       }, req);
     } catch (error) {
-      console.error(`Error logging create for entry ${entryId}:`, error);
+      logger.error(`Error logging create for entry ${entryId}:`, error);
       throw ERRORS.AUDIT_LOG_CREATION_FAILED;
     }
   }
@@ -386,7 +388,7 @@ export class AuditLogRepository {
         reason
       }, req);
     } catch (error) {
-      console.error(`Error logging update for entry ${entryId}:`, error);
+      logger.error(`Error logging update for entry ${entryId}:`, error);
       throw ERRORS.AUDIT_LOG_CREATION_FAILED;
     }
   }
@@ -410,7 +412,7 @@ export class AuditLogRepository {
         reason
       }, req);
     } catch (error) {
-      console.error(`Error logging delete for entry ${entryId}:`, error);
+      logger.error(`Error logging delete for entry ${entryId}:`, error);
       throw ERRORS.AUDIT_LOG_CREATION_FAILED;
     }
   }
@@ -438,7 +440,7 @@ export class AuditLogRepository {
 
       return updatedLog;
     } catch (error) {
-      console.error(`Error updating flag for audit log ${id}:`, error);
+      logger.error(`Error updating flag for audit log ${id}:`, error);
       if (error === ERRORS.AUDIT_LOG_NOT_FOUND) {
         throw error;
       }

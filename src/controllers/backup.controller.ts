@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import { backupService } from '../services/backup.service.js';
+import createLogger from '../utils/logger.ts';
+
+const logger = createLogger('@backupController');
 
 export class BackupController {
     
@@ -22,7 +25,7 @@ export class BackupController {
                 }
             });
         } catch (error: any) {
-            console.error('Get backup status error:', error);
+            logger.error('Get backup status error:', error);
             res.status(500).json({
                 success: false,
                 error: 'Failed to get backup status',
@@ -36,7 +39,7 @@ export class BackupController {
      */
     triggerBackup = async (req: Request, res: Response): Promise<void> => {
         try {
-            console.log(`Manual backup triggered by user: ${req.user?.username || 'unknown'}`);
+            logger.info(`Manual backup triggered by user: ${req.user?.username || 'unknown'}`);
             
             await backupService.triggerManualBackup();
             
@@ -46,7 +49,7 @@ export class BackupController {
                 timestamp: new Date().toISOString()
             });
         } catch (error: any) {
-            console.error('Manual backup error:', error);
+            logger.error('Manual backup error:', error);
             res.status(500).json({
                 success: false,
                 error: 'Manual backup failed',
@@ -60,7 +63,7 @@ export class BackupController {
      */
     triggerCleanup = async (req: Request, res: Response): Promise<void> => {
         try {
-            console.log(`Manual cleanup triggered by user: ${req.user?.username || 'unknown'}`);
+            logger.info(`Manual cleanup triggered by user: ${req.user?.username || 'unknown'}`);
             
             await backupService.triggerManualCleanup();
             
@@ -70,7 +73,7 @@ export class BackupController {
                 timestamp: new Date().toISOString()
             });
         } catch (error: any) {
-            console.error('Manual cleanup error:', error);
+            logger.error('Manual cleanup error:', error);
             res.status(500).json({
                 success: false,
                 error: 'Manual cleanup failed',

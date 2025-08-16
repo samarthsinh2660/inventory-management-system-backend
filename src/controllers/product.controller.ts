@@ -4,7 +4,9 @@ import { productFormulaRepository } from '../repositories/productFormula.reposit
 import { ERRORS } from '../utils/error.ts';
 import { successResponse, listResponse, createdResponse, updatedResponse, deletedResponse } from '../utils/response.ts';
 import { ProductCategory, ProductSearchParams, SourceType } from '../models/products.model.ts';
+import createLogger from '../utils/logger.ts';
 
+const logger = createLogger('@productController');
 
 
 /**
@@ -26,6 +28,7 @@ export const getProductById = async (req: Request, res: Response, next: NextFunc
     
     res.json(successResponse(product, 'Product retrieved successfully'));
   } catch (error: unknown) {
+    logger.warn('getProductById error:', error as any);
     next(error);
   }
 };
@@ -125,6 +128,7 @@ export const createProduct = async (req: Request, res: Response, next: NextFunct
       throw ERRORS.PRODUCT_CREATION_FAILED;
     }
   } catch (error: unknown) {
+    logger.warn('createProduct error:', error as any);
     next(error);
   }
 };
@@ -236,6 +240,7 @@ export const updateProduct = async (req: Request, res: Response, next: NextFunct
       throw ERRORS.PRODUCT_UPDATE_FAILED;
     }
   } catch (error: unknown) {
+    logger.warn('updateProduct error:', error as any);
     next(error);
   }
 };
@@ -272,6 +277,7 @@ export const deleteProduct = async (req: Request, res: Response, next: NextFunct
       throw ERRORS.PRODUCT_DELETION_FAILED;
     }
   } catch (error: unknown) {
+    logger.warn('deleteProduct error:', error as any);
     next(error);
   }
 };
@@ -396,6 +402,7 @@ export const getAllProducts = async (req: Request, res: Response, next: NextFunc
       }
     });
   } catch (error: unknown) {
+    logger.warn('getAllProducts error:', error as any);
     next(error);
   }
 };

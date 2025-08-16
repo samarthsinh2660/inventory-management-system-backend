@@ -1,5 +1,8 @@
 import fs from 'fs';
 import path from 'path';
+import createLogger from "./logger.ts";
+
+const logger = createLogger('@crashHandler');
 
 /**
  * Simple crash logger - logs crash details to file and console
@@ -24,16 +27,16 @@ const logCrash = (type: string, error: any, additionalInfo?: any) => {
     };
 
     // Log to console
-    console.error('\n🚨 ==================== APPLICATION CRASH ====================');
-    console.error(`💥 Crash Type: ${type}`);
-    console.error(`🕒 Time: ${crashLog.timestamp}`);
-    console.error(`❌ Error: ${crashLog.error.message}`);
-    console.error(`📊 Memory: ${Math.round(crashLog.processInfo.memoryUsage.heapUsed / 1024 / 1024)}MB`);
-    console.error(`⏱️ Uptime: ${Math.floor(crashLog.processInfo.uptime)}s`);
+    logger.error('\n🚨 ==================== APPLICATION CRASH ====================');
+    logger.error(`💥 Crash Type: ${type}`);
+    logger.error(`🕒 Time: ${crashLog.timestamp}`);
+    logger.error(`❌ Error: ${crashLog.error.message}`);
+    logger.error(`📊 Memory: ${Math.round(crashLog.processInfo.memoryUsage.heapUsed / 1024 / 1024)}MB`);
+    logger.error(`⏱️ Uptime: ${Math.floor(crashLog.processInfo.uptime)}s`);
     if (crashLog.error.stack) {
-        console.error(`📍 Stack:\n${crashLog.error.stack}`);
+        logger.error(`📍 Stack:\n${crashLog.error.stack}`);
     }
-    console.error('============================================================\n');
+    logger.error('============================================================\n');
 
     // Log to file (create logs directory if it doesn't exist)
     try {
@@ -46,9 +49,9 @@ const logCrash = (type: string, error: any, additionalInfo?: any) => {
         const logEntry = `${JSON.stringify(crashLog, null, 2)}\n---\n`;
         
         fs.appendFileSync(logFile, logEntry);
-        console.log(`📝 Crash logged to: ${logFile}`);
+        logger.info(`📝 Crash logged to: ${logFile}`);
     } catch (logError: any) {
-        console.error('Failed to write crash log to file:', logError?.message || logError);
+        logger.error('Failed to write crash log to file:', logError?.message || logError);
     }
 };
 
@@ -60,11 +63,11 @@ export const setupCrashHandlers = () => {
     process.on('uncaughtException', (error: Error) => {
         logCrash('UNCAUGHT_EXCEPTION', error);
         
-        console.log('🔄 Attempting to restart application in 2 seconds...');
+        logger.info('🔄 Attempting to restart application in 2 seconds...');
         
         // Give time for logs to be written, then restart
         setTimeout(() => {
-            console.log('🚀 Restarting application...');
+            logger.info('🚀 Restarting application...');
             process.exit(1); // Exit with error code, process manager will restart
         }, 2000);
     });
@@ -75,27 +78,27 @@ export const setupCrashHandlers = () => {
             promise: promise.toString()
         });
         
-        console.log('🔄 Attempting to restart application in 2 seconds...');
+        logger.info('🔄 Attempting to restart application in 2 seconds...');
         
         // Give time for logs to be written, then restart
         setTimeout(() => {
-            console.log('🚀 Restarting application...');
+            logger.info('🚀 Restarting application...');
             process.exit(1); // Exit with error code, process manager will restart
         }, 2000);
     });
 
     // Handle graceful shutdown signals
     process.on('SIGTERM', () => {
-        console.log('📨 Received SIGTERM signal, shutting down gracefully...');
+        logger.info('📨 Received SIGTERM signal, shutting down gracefully...');
         process.exit(0);
     });
 
     process.on('SIGINT', () => {
-        console.log('📨 Received SIGINT signal, shutting down gracefully...');
+        logger.info('📨 Received SIGINT signal, shutting down gracefully...');
         process.exit(0);
     });
 
-    console.log('🛡️ Crash handlers initialized - app will restart automatically on crashes');
+    logger.info('🛡️ Crash handlers initialized - app will restart automatically on crashes');
 };
 
 /**

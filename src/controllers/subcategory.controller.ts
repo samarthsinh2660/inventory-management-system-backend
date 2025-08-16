@@ -4,6 +4,10 @@ import { ERRORS } from '../utils/error.ts';
 import { successResponse, listResponse, createdResponse, updatedResponse, deletedResponse } from '../utils/response.ts';
 import { SubcategoryCreateParams, SubcategoryUpdateParams } from '../models/subCategories.model.ts';
 
+import createLogger from '../utils/logger.ts';
+
+const logger = createLogger('@subcategoryController');
+
 /**
  * Get all subcategories (with optional category filter)
  */
@@ -29,6 +33,7 @@ export const getAllSubcategories = async (req: Request, res: Response, next: Nex
     
     res.json(listResponse(subcategories, message));
   } catch (error: unknown) {
+    logger.warn('getAllSubcategories error:', error as any);
     next(error);
   }
 };
@@ -52,6 +57,7 @@ export const getSubcategoryById = async (req: Request, res: Response, next: Next
     
     res.json(successResponse(subcategory, 'Subcategory retrieved successfully'));
   } catch (error: unknown) {
+    logger.warn('getSubcategoryById error:', error as any);
     next(error);
   }
 };
@@ -95,6 +101,7 @@ export const createSubcategory = async (req: Request, res: Response, next: NextF
       throw ERRORS.SUBCATEGORY_CREATION_FAILED;
     }
   } catch (error: unknown) {
+    logger.warn('createSubcategory error:', error as any);
     next(error);
   }
 };
@@ -149,6 +156,7 @@ export const updateSubcategory = async (req: Request, res: Response, next: NextF
       throw ERRORS.SUBCATEGORY_UPDATE_FAILED;
     }
   } catch (error: unknown) {
+    logger.warn('updateSubcategory error:', error as any);
     next(error);
   }
 };
@@ -183,6 +191,7 @@ export const deleteSubcategory = async (req: Request, res: Response, next: NextF
       }
     }
   } catch (error: unknown) {
+    logger.warn('deleteSubcategory error:', error as any);
     next(error);
   }
 };

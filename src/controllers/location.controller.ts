@@ -3,6 +3,9 @@ import { locationRepository } from '../repositories/location.repository.ts';
 import { ERRORS } from '../utils/error.ts';
 import { successResponse, listResponse, createdResponse, updatedResponse, deletedResponse } from '../utils/response.ts';
 import { LocationCreateParams, LocationUpdateParams } from '../models/locations.model.ts';
+import createLogger from '../utils/logger.ts';
+
+const logger = createLogger('@locationController');
 
 /**
  * Get all locations
@@ -12,6 +15,7 @@ export const getAllLocations = async (req: Request, res: Response, next: NextFun
     const locations = await locationRepository.getAllLocations(req);
     res.json(listResponse(locations, 'Locations retrieved successfully'));
   } catch (error: unknown) {
+    logger.warn('getAllLocations error:', error as any);
     next(error);
   }
 };
@@ -35,6 +39,7 @@ export const getLocationById = async (req: Request, res: Response, next: NextFun
     
     res.json(successResponse(location, 'Location retrieved successfully'));
   } catch (error: unknown) {
+    logger.warn('getLocationById error:', error as any);
     next(error);
   }
 };
@@ -71,6 +76,7 @@ export const createLocation = async (req: Request, res: Response, next: NextFunc
       throw ERRORS.LOCATION_CREATION_FAILED;
     }
   } catch (error: unknown) {
+    logger.warn('createLocation error:', error as any);
     next(error);
   }
 };
@@ -120,6 +126,7 @@ export const updateLocation = async (req: Request, res: Response, next: NextFunc
       throw ERRORS.LOCATION_UPDATE_FAILED;
     }
   } catch (error: unknown) {
+    logger.warn('updateLocation error:', error as any);
     next(error);
   }
 };
@@ -153,6 +160,7 @@ export const deleteLocation = async (req: Request, res: Response, next: NextFunc
       }
     }
   } catch (error: unknown) {
+    logger.warn('deleteLocation error:', error as any);
     next(error);
   }
 };

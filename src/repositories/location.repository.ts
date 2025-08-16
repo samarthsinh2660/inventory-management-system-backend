@@ -4,6 +4,7 @@ import { ResultSetHeader } from 'mysql2';
 import { ERRORS } from '../utils/error.ts';
 import { Pool } from 'mysql2/promise';
 
+
 export class LocationRepository {
     private getPool(req?: any): Pool {
       return req?.factoryPool || db;

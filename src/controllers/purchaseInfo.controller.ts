@@ -4,6 +4,10 @@ import { ERRORS } from '../utils/error.ts';
 import { successResponse, listResponse, createdResponse, updatedResponse, deletedResponse } from '../utils/response.ts';
 import { PurchaseInfoCreateParams, PurchaseInfoUpdateParams } from '../models/purchaseInfo.model.ts';
 
+import createLogger from '../utils/logger.ts';
+
+const logger = createLogger('@purchaseInfoController');
+
 /**
  * Get all purchase infos (with optional search)
  */
@@ -25,6 +29,7 @@ export const getAllPurchaseInfos = async (req: Request, res: Response, next: Nex
     
     res.json(listResponse(purchaseInfos, message));
   } catch (error: unknown) {
+    logger.warn('getAllPurchaseInfos error:', error as any);
     next(error);
   }
 };
@@ -48,6 +53,7 @@ export const getPurchaseInfoById = async (req: Request, res: Response, next: Nex
     
     res.json(successResponse(purchaseInfo, 'Purchase info retrieved successfully'));
   } catch (error: unknown) {
+    logger.warn('getPurchaseInfoById error:', error as any);
     next(error);
   }
 };
@@ -73,6 +79,7 @@ export const getProductsByPurchaseInfo = async (req: Request, res: Response, nex
     
     res.json(listResponse(products, `Products for purchase info '${purchaseInfo.business_name}' retrieved successfully`));
   } catch (error: unknown) {
+    logger.warn('getProductsByPurchaseInfo error:', error as any);
     next(error);
   }
 };
@@ -120,6 +127,7 @@ export const createPurchaseInfo = async (req: Request, res: Response, next: Next
       throw ERRORS.DATABASE_ERROR;
     }
   } catch (error: unknown) {
+    logger.warn('createPurchaseInfo error:', error as any);
     next(error);
   }
 };
@@ -182,6 +190,7 @@ export const updatePurchaseInfo = async (req: Request, res: Response, next: Next
       throw ERRORS.DATABASE_ERROR;
     }
   } catch (error: unknown) {
+    logger.warn('updatePurchaseInfo error:', error as any);
     next(error);
   }
 };
@@ -216,6 +225,7 @@ export const deletePurchaseInfo = async (req: Request, res: Response, next: Next
       }
     }
   } catch (error: unknown) {
+    logger.warn('deletePurchaseInfo error:', error as any);
     next(error);
   }
 };

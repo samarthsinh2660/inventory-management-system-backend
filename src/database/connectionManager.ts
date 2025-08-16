@@ -1,5 +1,8 @@
 import mysql, { Pool, PoolConnection } from "mysql2/promise";
 import { Factory } from "../models/factory.model.js";
+import createLogger from "../utils/logger.js";
+
+const logger = createLogger('@connectionManager');
 
 // In-memory cache for connection pools
 const poolCache = new Map<string, Pool>();
@@ -29,7 +32,7 @@ export const initializeCentralDB = (config: {
         keepAliveInitialDelay: 0,
     });
     
-    console.log("✅ Central DB pool initialized");
+    logger.info("✅ Central DB pool initialized");
 };
 
 export const getCentralDB = (): Pool => {
@@ -75,10 +78,10 @@ export const getFactoryPool = async (factory: Factory): Promise<Pool> => {
             await connection.ping();
             connection.release();
             
-            console.log(`✅ Reusing existing pool for factory: ${factory.factory_name}`);
+           
             return existingPool;
         } catch (error) {
-            console.warn(`⚠️ Existing pool for ${factory.factory_name} is unhealthy, recreating...`);
+            logger.warn(`⚠️ Existing pool for ${factory.factory_name} is unhealthy, recreating...`);
             // Remove the unhealthy pool
             existingPool.end();
             poolCache.delete(poolKey);
@@ -86,7 +89,7 @@ export const getFactoryPool = async (factory: Factory): Promise<Pool> => {
     }
     
     // Create new pool
-    console.log(`🔄 Creating new pool for factory: ${factory.factory_name}`);
+    logger.info(`🔄 Creating new pool for factory: ${factory.factory_name}`);
     
     const newPool = mysql.createPool({
         host: factory.db_host,
@@ -111,11 +114,11 @@ export const getFactoryPool = async (factory: Factory): Promise<Pool> => {
         
         // Cache the pool
         poolCache.set(poolKey, newPool);
-        console.log(`✅ New pool created and cached for factory: ${factory.factory_name}`);
+        logger.info(`✅ New pool created and cached for factory: ${factory.factory_name}`);
         
         return newPool;
     } catch (error) {
-        console.error(`❌ Failed to create pool for factory ${factory.factory_name}:`, error);
+        logger.error(`❌ Failed to create pool for factory ${factory.factory_name}:`, error);
         newPool.end();
         throw new Error(`Unable to connect to factory database: ${factory.factory_name}`);
     }
@@ -136,26 +139,26 @@ export const getPoolByUsername = async (username: string): Promise<Pool> => {
         // Get or create connection pool
         return await getFactoryPool(factory);
     } catch (error) {
-        console.error("Error getting pool by username:", error);
+        logger.error("Error getting pool by username:", error);
         throw error;
     }
 };
 
 // Cleanup function to close all pools
 export const closeAllPools = async (): Promise<void> => {
-    console.log("🔄 Closing all connection pools...");
+    logger.info("🔄 Closing all connection pools...");
     
     const closePromises: Promise<void>[] = [];
     
     // Close factory pools
     for (const [factoryName, pool] of poolCache.entries()) {
-        console.log(`Closing pool for factory: ${factoryName}`);
+        logger.info(`Closing pool for factory: ${factoryName}`);
         closePromises.push(pool.end());
     }
     
     // Close central pool
     if (centralPool) {
-        console.log("Closing central DB pool");
+        logger.info("Closing central DB pool");
         closePromises.push(centralPool.end());
     }
     
@@ -164,7 +167,7 @@ export const closeAllPools = async (): Promise<void> => {
     poolCache.clear();
     centralPool = null;
     
-    console.log("✅ All pools closed successfully");
+    logger.info("✅ All pools closed successfully");
 };
 
 // Health check for all pools

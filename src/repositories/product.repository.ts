@@ -3,6 +3,9 @@ import { Pool } from 'mysql2/promise';
 import { Product, ProductCategory, ProductCreateParams, ProductSearchParams } from '../models/products.model.ts';
 import { ResultSetHeader } from 'mysql2';
 import { ERRORS } from '../utils/error.ts';
+import createLogger from '../utils/logger.ts';
+
+const logger = createLogger('@ProductRepository')
 
 export class ProductRepository {
   
@@ -122,7 +125,7 @@ export class ProductRepository {
 
       return rows[0] as Product;
     } catch (error) {
-      console.error('Error creating product:', error);
+      logger.error('Error creating product:', error);
 
       if (error === ERRORS.PRODUCT_NAME_EXISTS) {
         throw error;
@@ -243,7 +246,7 @@ export class ProductRepository {
       // Get the updated product
       return await this.findById(id, req);
     } catch (error) {
-      console.error('Error updating product:', error);
+      logger.error('Error updating product:', error);
 
       if (error === ERRORS.PRODUCT_NOT_FOUND || error === ERRORS.PRODUCT_NAME_EXISTS) {
         throw error;
@@ -321,7 +324,7 @@ export class ProductRepository {
       
       return result.affectedRows > 0;
     } catch (error) {
-      console.error('Error deleting product:', error);
+      logger.error('Error deleting product:', error);
       
       if (
         error === ERRORS.PRODUCT_NOT_FOUND || 
@@ -446,7 +449,7 @@ export class ProductRepository {
 
       return { products, total };
     } catch (error) {
-      console.error('Search products error:', error);
+      logger.error('Search products error:', error);
       throw ERRORS.PRODUCT_SEARCH_FAILED;
     }
   }

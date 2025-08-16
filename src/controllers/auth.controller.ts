@@ -6,6 +6,9 @@ import { ERRORS } from '../utils/error.ts';
 import { userRepository } from '../repositories/user.repository.ts';
 import { extractFactoryFromUsername, getPoolByUsername, healthCheckPools, getPoolStats } from '../database/connectionManager.ts';
 import { FactoryRepository } from '../repositories/factory.repository.ts';
+import createLogger from '../utils/logger.ts';
+ 
+const logger = createLogger('@authController');
 
 export const signup = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -18,37 +21,28 @@ export const signup = async (req: Request, res: Response, next: NextFunction): P
         }
 
         if (!['master', 'employee'].includes(role)) {
-            throw ERRORS.VALIDATION_ERROR;
+            throw ERRORS.INVALID_ROLE;
         }
 
         // Only masters can create users
         if (!currentUser.is_master) {
-            res.status(403).json({
-                error: 'Only master users can create new accounts'
-            });
-            return;
+            throw ERRORS.USER_CREATION_MASTER_ONLY;
         }
 
         // Ensure factory context exists
         if (!currentUser.factory_db) {
-            res.status(400).json({
-                error: 'Factory context required for user creation'
-            });
-            return;
+            throw ERRORS.FACTORY_CONTEXT_REQUIRED;
         }
 
         // Username should NOT contain @ (we'll add factory suffix)
         if (username.includes('@')) {
-            res.status(400).json({
-                error: 'Username should not contain @ symbol. Factory context will be added automatically.'
-            });
-            return;
+            throw ERRORS.INVALID_USERNAME_FORMAT;
         }
 
         // Check if user already exists in this factory
         const existingUser = await userRepository.findByUsername(username, req);
         if (existingUser) {
-            throw ERRORS.DUPLICATE_RESOURCE;
+            throw ERRORS.USERNAME_ALREADY_EXISTS;
         }
 
         // Hash password
@@ -79,6 +73,7 @@ export const signup = async (req: Request, res: Response, next: NextFunction): P
             successResponse(userResponse, `${role === 'master' ? 'Master' : 'Employee'} account created successfully`)
         );
     } catch (error) {
+        logger.warn('signup error:', error as any);
         next(error);
     }
 };
@@ -93,10 +88,7 @@ export const signin = async (req: Request, res: Response, next: NextFunction): P
 
         // Multi-tenant only login (username must contain @)
         if (!username.includes('@')) {
-            res.status(400).json({
-                error: 'Invalid username format. Expected format: user@factory_name'
-            });
-            return;
+            throw ERRORS.INVALID_USERNAME_FORMAT;
         }
 
         // Extract factory and user parts
@@ -112,13 +104,13 @@ export const signin = async (req: Request, res: Response, next: NextFunction): P
         // Use user repository with factory pool
         const user = await userRepository.findByUsername(userPart, mockReq);
         if (!user) {
-            throw ERRORS.UNAUTHORIZED;
+            throw ERRORS.INVALID_CREDENTIALS;
         }
 
         // Verify password
         const isValidPassword = await bcrypt.compare(password, user.password);
         if (!isValidPassword) {
-            throw ERRORS.UNAUTHORIZED;
+            throw ERRORS.INVALID_CREDENTIALS;
         }
 
         // Create token data for multi-tenant
@@ -148,6 +140,7 @@ export const signin = async (req: Request, res: Response, next: NextFunction): P
             }, "Login successful")
         );
     } catch (error) {
+        logger.warn('signin error:', error as any);
         next(error);
     }
 };
@@ -166,6 +159,7 @@ export const getProfile = async (req: Request, res: Response, next: NextFunction
 
         res.json(successResponse(userProfile, 'Profile retrieved successfully'));
     } catch (error) {
+        logger.warn('getProfile error:', error as any);
         next(error);
     }
 };
@@ -190,11 +184,11 @@ export const updateProfile = async (req: Request, res: Response, next: NextFunct
         // Handle username change with validation and uniqueness check
         if (username !== undefined) {
             if (typeof username !== 'string' || username.includes('@') || username.trim() === '') {
-                throw ERRORS.VALIDATION_ERROR;
+                throw ERRORS.INVALID_USERNAME_FORMAT;
             }
             const existing = await userRepository.findByUsername(username, req);
             if (existing && existing.id !== req.user.id) {
-                throw ERRORS.RESOURCE_ALREADY_EXISTS;
+                throw ERRORS.USERNAME_ALREADY_EXISTS;
             }
             updateData.username = username;
         }
@@ -214,7 +208,7 @@ export const updateProfile = async (req: Request, res: Response, next: NextFunct
             // Verify current password
             const isValidPassword = await bcrypt.compare(currentPassword, user.password);
             if (!isValidPassword) {
-                throw ERRORS.UNAUTHORIZED;
+                throw ERRORS.INVALID_CREDENTIALS;
             }
 
             // Hash new password
@@ -235,6 +229,7 @@ export const updateProfile = async (req: Request, res: Response, next: NextFunct
 
         res.json(successResponse(updatedUser, 'Profile updated successfully'));
     } catch (error) {
+        logger.warn('updateProfile error:', error as any);
         next(error);
     }
 };
@@ -288,6 +283,7 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
             'Token refreshed successfully'
         ));
     } catch (error) {
+        logger.warn('refreshToken error:', error as any);
         next(error);
     }
 };
@@ -305,6 +301,7 @@ export const healthCheck = async (req: Request, res: Response, next: NextFunctio
             timestamp: new Date().toISOString()
         }));
     } catch (error) {
+        logger.warn('healthCheck error:', error as any);
         next(error);
     }
 };
@@ -328,24 +325,8 @@ export const getFactories = async (req: Request, res: Response, next: NextFuncti
             total: publicFactories.length
         }));
     } catch (error) {
+        logger.warn('getFactories error:', error as any);
         next(error);
     }
 };
 
-export const logout = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-        // For JWT, logout is typically handled client-side by removing the token
-        const user = req.user as TokenData;
-        if (user && user.factory_db) {
-            console.log(`User ${user.username} logged out from factory ${user.factory_db}`);
-        } else if (user) {
-            console.log(`User ${user.username} logged out`);
-        }
-
-        res.json(successResponse({
-            message: "Logged out successfully"
-        }));
-    } catch (error) {
-        next(error);
-    }
-};

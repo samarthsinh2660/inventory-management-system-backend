@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { signup, signin, getProfile, updateProfile, refreshToken, healthCheck, getFactories, logout } from '../controllers/auth.controller.ts';
+import { signup, signin, getProfile, updateProfile, refreshToken, healthCheck, getFactories } from '../controllers/auth.controller.ts';
 import { authenticate, requireMaster } from '../middleware/auth.middleware.ts';
 
 const LoginRouter = Router();
@@ -13,7 +13,6 @@ LoginRouter.post('/signup', authenticate, requireMaster, signup); // Only master
 LoginRouter.get('/profile', authenticate, getProfile);
 LoginRouter.get('/me', authenticate, getProfile); // Alias for profile
 LoginRouter.put('/profile', authenticate, updateProfile);
-LoginRouter.post('/logout', authenticate, logout);
 
 // Multi-tenant specific routes
 LoginRouter.get('/health', healthCheck);

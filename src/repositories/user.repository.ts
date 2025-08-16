@@ -4,6 +4,9 @@ import { Pool } from 'mysql2/promise';
 import { ResultSetHeader } from 'mysql2';
 import { ConnectionSyncService } from '../services/connectionSync.service.ts';
 import { ERRORS } from '../utils/error.ts';
+import createLogger from '../utils/logger.ts';
+
+const logger = createLogger('@UserRepository')
 
 export class UserRepository {
     private getPool(req?: any): Pool {
@@ -77,7 +80,7 @@ export class UserRepository {
         const syncService = new ConnectionSyncService();
         await syncService.syncMaxConnections(req.user.factory_db, req);
       } catch (error) {
-        console.warn('Failed to sync connections after user creation:', error);
+        logger.warn('Failed to sync connections after user creation:', error);
         // Don't fail user creation if connection sync fails
       }
     }
@@ -194,7 +197,7 @@ export class UserRepository {
         const syncService = new ConnectionSyncService();
         await syncService.syncMaxConnections(req.user.factory_db, req);
       } catch (error) {
-        console.warn('Failed to sync connections after user deletion:', error);
+        logger.warn('Failed to sync connections after user deletion:', error);
         // Don't fail user deletion if connection sync fails
       }
     }

@@ -6,6 +6,10 @@ import { successResponse, listResponse, createdResponse, updatedResponse, delete
 import { ProductCategory } from '../models/products.model.ts';
 import { FormulaComponentData, ProductFormulaCreateParams, ProductFormulaUpdateParams } from '../models/productFormula.model.ts';
 
+import createLogger from '../utils/logger.ts';
+
+const logger = createLogger('@productFormulaController');
+
 /**
  * Get all product formulas
  */
@@ -14,6 +18,7 @@ export const getAllFormulas = async (req: Request, res: Response, next: NextFunc
     const formulas = await productFormulaRepository.getAllFormulas(req);
     res.json(listResponse(formulas, 'Product formulas retrieved successfully'));
   } catch (error: unknown) {
+    logger.warn('getAllFormulas error:', error as any);
     next(error);
   }
 };
@@ -37,6 +42,7 @@ export const getFormulaById = async (req: Request, res: Response, next: NextFunc
     
     res.json(successResponse(formula, 'Product formula retrieved successfully'));
   } catch (error: unknown) {
+    logger.warn('getFormulaById error:', error as any);
     next(error);
   }
 };
@@ -62,6 +68,7 @@ export const getProductsByFormulaId = async (req: Request, res: Response, next: 
     
     res.json(listResponse(products, 'Products using formula retrieved successfully'));
   } catch (error: unknown) {
+    logger.warn('getProductsByFormulaId error:', error as any);
     next(error);
   }
 };
@@ -117,6 +124,7 @@ export const createFormula = async (req: Request, res: Response, next: NextFunct
       throw ERRORS.FORMULA_CREATION_FAILED;
     }
   } catch (error: unknown) {
+    logger.warn('createFormula error:', error as any);
     next(error);
   }
 };
@@ -188,6 +196,7 @@ export const updateFormula = async (req: Request, res: Response, next: NextFunct
       throw ERRORS.FORMULA_UPDATE_FAILED;
     }
   } catch (error: unknown) {
+    logger.warn('updateFormula error:', error as any);
     next(error);
   }
 };
@@ -221,6 +230,7 @@ export const deleteFormula = async (req: Request, res: Response, next: NextFunct
       }
     }
   } catch (error: unknown) {
+    logger.warn('deleteFormula error:', error as any);
     next(error);
   }
 };
@@ -272,6 +282,7 @@ export const updateFormulaComponent = async (req: Request, res: Response, next: 
       throw ERRORS.COMPONENT_UPDATE_FAILED;
     }
   } catch (error: unknown) {
+    logger.warn('updateFormulaComponent error:', error as any);
     next(error);
   }
 };
@@ -306,6 +317,7 @@ export const removeFormulaComponent = async (req: Request, res: Response, next: 
       }
     }
   } catch (error: unknown) {
+    logger.warn('removeFormulaComponent error:', error as any);
     next(error);
   }
 };

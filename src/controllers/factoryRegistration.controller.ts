@@ -122,7 +122,7 @@ export class FactoryRegistrationController {
             });
 
         } catch (error: any) {
-            console.error('Factory registration error:', error);
+            logger.error('Factory registration error:', error);
             res.status(500).json({
                 error: 'Failed to register factory',
                 details: error.message
@@ -150,7 +150,7 @@ export class FactoryRegistrationController {
             });
 
         } catch (error: any) {
-            console.error('Get factories error:', error);
+            logger.error('Get factories error:', error);
             res.status(500).json({
                 error: 'Failed to get factories',
                 details: error.message
@@ -169,7 +169,7 @@ export class FactoryRegistrationController {
             });
 
         } catch (error: any) {
-            console.error('Sync connections error:', error);
+            logger.error('Sync connections error:', error);
             res.status(500).json({
                 error: 'Failed to sync connections',
                 details: error.message

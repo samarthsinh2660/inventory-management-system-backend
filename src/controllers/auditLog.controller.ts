@@ -1,17 +1,21 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { 
   successResponse, 
   deletedResponse, 
   responseWithMeta 
 } from '../utils/response.ts';
-import { ERRORS, handleUnknownError, RequestError } from '../utils/error.ts';
+import { ERRORS, RequestError } from '../utils/error.ts';
 import auditLogRepository from '../repositories/auditLog.repository.ts';
 import { AuditLogFilters } from '../models/auditLogs.model.ts'; 
+import createLogger from '../utils/logger.ts';
+
+
+const logger = createLogger('@auditLogController');
 
 /**
  * Get all audit logs with comprehensive filtering and pagination
  */
-export const getAllLogs = async (req: Request, res: Response): Promise<void> => {
+export const getAllLogs = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     // Parse and validate filter parameters
     const filters: AuditLogFilters = {};
@@ -156,77 +160,44 @@ export const getAllLogs = async (req: Request, res: Response): Promise<void> => 
       'Audit logs retrieved successfully'
     ));
   } catch (error) {
-    const requestError = handleUnknownError(error);
-    res.status(requestError.statusCode).json({
-      success: false,
-      error: {
-        code: requestError.code,
-        message: requestError.message
-      }
-    });
+    logger.warn('getAllLogs error:', error as any);
+    next(error);
   }
 };
 
 /**
  * Get a specific audit log by ID
  */
-export const getLogById = async (req: Request, res: Response): Promise<void> => {
+export const getLogById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const logId = parseInt(req.params.id);
     
     if (isNaN(logId)) {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: ERRORS.INVALID_PARAMS.code,
-          message: "Invalid audit log ID"
-        }
-      });
-      return;
+      throw ERRORS.AUDIT_LOG_INVALID_ID;
     }
     
     const log = await auditLogRepository.findById(logId ,req);
     
     if (!log) {
-      res.status(404).json({
-        success: false,
-        error: {
-          code: ERRORS.AUDIT_LOG_NOT_FOUND.code,
-          message: ERRORS.AUDIT_LOG_NOT_FOUND.message
-        }
-      });
-      return;
+      throw ERRORS.AUDIT_LOG_NOT_FOUND;
     }
     
     res.json(successResponse(log, 'Audit log retrieved successfully'));
   } catch (error) {
-    const requestError = handleUnknownError(error);
-    res.status(requestError.statusCode).json({
-      success: false,
-      error: {
-        code: requestError.code,
-        message: requestError.message
-      }
-    });
+    logger.warn('getLogById error:', error as any);
+    next(error);
   }
 };
 
 /**
  * Get audit logs for a specific inventory entry
  */
-export const getLogsByEntryId = async (req: Request, res: Response): Promise<void> => {
+export const getLogsByEntryId = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const entryId = parseInt(req.params.entryId);
     
     if (isNaN(entryId)) {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: ERRORS.INVALID_PARAMS.code,
-          message: "Invalid inventory entry ID"
-        }
-      });
-      return;
+      throw new RequestError('Invalid inventory entry ID', ERRORS.AUDIT_LOG_INVALID_FILTER.code, 400);
     }
     
     const page = parseInt(req.query.page as string) || 1;
@@ -250,57 +221,29 @@ export const getLogsByEntryId = async (req: Request, res: Response): Promise<voi
       'Entry audit logs retrieved successfully'
     ));
   } catch (error) {
-    const requestError = handleUnknownError(error);
-    res.status(requestError.statusCode).json({
-      success: false,
-      error: {
-        code: requestError.code,
-        message: requestError.message
-      }
-    });
+    next(error);
   }
 };
 
 /**
  * Delete an audit log (master users only)
  */
-export const deleteLog = async (req: Request, res: Response): Promise<void> => {
+export const deleteLog = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     // Check if user exists in the request (should be added by authenticate middleware)
     if (!req.user) {
-      res.status(401).json({
-        success: false,
-        error: {
-          code: ERRORS.UNAUTHORIZED.code,
-          message: ERRORS.UNAUTHORIZED.message
-        }
-      });
-      return;
+      throw ERRORS.UNAUTHORIZED;
     }
     
     // Only master users can delete audit logs
     if (!(req.user as any).is_master) {
-      res.status(403).json({
-        success: false,
-        error: {
-          code: ERRORS.AUDIT_LOG_MASTER_ONLY.code,
-          message: ERRORS.AUDIT_LOG_MASTER_ONLY.message
-        }
-      });
-      return;
+      throw ERRORS.AUDIT_LOG_MASTER_ONLY;
     }
     
     const logId = parseInt(req.params.id);
     
     if (isNaN(logId)) {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: ERRORS.INVALID_PARAMS.code,
-          message: "Invalid audit log ID"
-        }
-      });
-      return;
+      throw ERRORS.AUDIT_LOG_INVALID_ID;
     }
     
     // Check if we should revert the changes when deleting the log
@@ -315,15 +258,8 @@ export const deleteLog = async (req: Request, res: Response): Promise<void> => {
     
     res.json(deletedResponse(message));
   } catch (error) {
-    console.error("Error in deleteLog:", error);
-    const requestError = handleUnknownError(error);
-    res.status(requestError.statusCode).json({
-      success: false,
-      error: {
-        code: requestError.code,
-        message: requestError.message
-      }
-    });
+    logger.warn('deleteLog error:', error as any);
+    next(error);
   }
 };
 
@@ -331,32 +267,18 @@ export const deleteLog = async (req: Request, res: Response): Promise<void> => {
  * Update the flag status of an audit log
  * Only masters can update flags for resolution with employees
  */
-export const updateFlag = async (req: Request, res: Response): Promise<void> => {
+export const updateFlag = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const logId = parseInt(req.params.id);
     
     if (isNaN(logId)) {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: 400,
-          message: "Invalid audit log ID"
-        }
-      });
-      return;
+      throw ERRORS.AUDIT_LOG_INVALID_ID;
     }
     
     const { is_flag } = req.body;
     
     if (typeof is_flag !== 'boolean') {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: 400,
-          message: "is_flag must be a boolean value"
-        }
-      });
-      return;
+      throw ERRORS.AUDIT_LOG_FLAG_INVALID;
     }
     
     const updatedLog = await auditLogRepository.updateFlag(logId, is_flag, req);
@@ -366,14 +288,7 @@ export const updateFlag = async (req: Request, res: Response): Promise<void> => 
       `Audit log flag ${is_flag ? 'set' : 'unset'} successfully`
     ));
   } catch (error) {
-    console.error("Error in updateFlag:", error);
-    const requestError = handleUnknownError(error);
-    res.status(requestError.statusCode).json({
-      success: false,
-      error: {
-        code: requestError.code,
-        message: requestError.message
-      }
-    });
+    logger.warn('updateFlag error:', error as any);
+    next(error);
   }
 };

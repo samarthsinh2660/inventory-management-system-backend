@@ -61,6 +61,7 @@ export const ERRORS = {
     DUPLICATE_RESOURCE: new RequestError("Resource already exists", 10010, 409),
     RESOURCE_ALREADY_EXISTS: new RequestError("Resource already exists", 10010, 409),
     RESOURCE_IN_USE: new RequestError("Resource is in use and cannot be deleted", 10011, 400),
+    PAGE_MUST_BE_POSITIVE_INTEGER: new RequestError("Page must be a positive integer", 10012, 400),
     
     // User Management Errors (11xxx)
     INVALID_ROLE: new RequestError("Invalid role value. Allowed values: 'master', 'employee'", 11001, 400),
@@ -70,6 +71,8 @@ export const ERRORS = {
     USERNAME_ALREADY_EXISTS: new RequestError("Username already exists", 11005, 409),
     EMAIL_ALREADY_EXISTS: new RequestError("Email already exists", 11006, 409),
     USER_NOT_FOUND: new RequestError("User not found", 11007, 404),
+    INVALID_USERNAME_FORMAT: new RequestError("Invalid username format", 11008, 400),
+    USER_CREATION_MASTER_ONLY: new RequestError("Only master users can create new accounts", 11009, 403),
     // Authentication & Authorization Errors (2xxxx)
     NO_TOKEN_PROVIDED: new RequestError("No authentication token provided", 20001, 401),
     INVALID_AUTH_TOKEN: new RequestError("Invalid authentication token", 20002, 401),
@@ -82,6 +85,7 @@ export const ERRORS = {
     INSUFFICIENT_PERMISSIONS: new RequestError("Insufficient permissions", 20009, 403),
     INVALID_CREDENTIALS: new RequestError("Invalid username or password", 20010, 401),
     ACCOUNT_LOCKED: new RequestError("Account is locked. Please contact administrator", 20011, 403),
+    FACTORY_CONTEXT_REQUIRED: new RequestError("Factory context required", 20012, 400),
     
     // Product Management Errors (3xxxx) 
     PRODUCT_NOT_FOUND: new RequestError("Product not found", 30001, 404),
@@ -168,6 +172,8 @@ export const ERRORS = {
     AUDIT_LOG_ACTION_REQUIRED: new RequestError("Action type is required", 80007, 400),
     AUDIT_LOG_INVALID_FILTER: new RequestError("Invalid audit log filter parameter", 80008, 400),
     AUDIT_LOG_FILTER_SEARCH_FAILED: new RequestError("Failed to search audit logs", 80009, 500),
+    AUDIT_LOG_INVALID_ID: new RequestError("Invalid audit log ID", 80010, 400),
+    AUDIT_LOG_FLAG_INVALID: new RequestError("is_flag must be a boolean value", 80011, 400),
     
     // Alert and Notification Management Errors (9xxxx)
     ALERT_NOT_FOUND: new RequestError("Alert not found", 90001, 404),

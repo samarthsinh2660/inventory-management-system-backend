@@ -4,6 +4,9 @@ import { userRepository } from '../repositories/user.repository.ts';
 import { ERRORS } from '../utils/error.ts';
 import { successResponse } from '../utils/response.ts';
 import { TokenData } from '../utils/jwt.ts';
+import createLogger from '../utils/logger.ts';
+
+const logger = createLogger('@userController');
 
 /**
  * Get all users (master only)
@@ -15,6 +18,7 @@ export const getAllUsers = async (req: Request, res: Response, next: NextFunctio
         const users = await userRepository.getAllUsers(req);
         res.json(successResponse(users, 'Users retrieved successfully'));
     } catch (error) {
+        logger.warn('getAllUsers error:', error as any);
         next(error);
     }
 };
@@ -56,6 +60,7 @@ export const createUser = async (req: Request, res: Response, next: NextFunction
             successResponse(userWithoutPassword, 'User created successfully')
         );
     } catch (error) {
+        logger.warn('createUser error:', error as any);
         next(error);
     }
 };
@@ -89,6 +94,7 @@ export const deleteUser = async (req: Request, res: Response, next: NextFunction
         
         res.json(successResponse(null, 'User deleted successfully'));
     } catch (error) {
+        logger.warn('deleteUser error:', error as any);
         next(error);
     }
 };
@@ -156,6 +162,7 @@ export const updateUser = async (req: Request, res: Response, next: NextFunction
         
         res.json(successResponse(updatedUser, 'User updated successfully'));
     } catch (error) {
+        logger.warn('updateUser error:', error as any);
         next(error);
     }
 };

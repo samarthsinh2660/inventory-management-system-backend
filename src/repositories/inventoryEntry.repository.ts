@@ -12,6 +12,9 @@ import {
   FilteredInventoryEntriesResponse
 } from "../models/inventoryEntries.model.ts";
 import { FormulaComponentData } from "../models/productFormula.model.ts";
+import createLogger from '../utils/logger.ts';
+
+const logger = createLogger('@InventoryEntryRepository')
 
 export class InventoryEntryRepository {
   private getPool(req?: any): Pool {
@@ -157,7 +160,7 @@ export class InventoryEntryRepository {
         filters_applied: filters
       };
     } catch (error) {
-      console.error("Error finding inventory entries with filters:", error);
+      logger.error("Error finding inventory entries with filters:", error);
       throw ERRORS.DATABASE_ERROR;
     }
   }
@@ -178,7 +181,7 @@ export class InventoryEntryRepository {
       
       return entries.length > 0 ? entries[0] : null;
     } catch (error) {
-      console.error(`Error finding inventory entry with id ${id}:`, error);
+      logger.error(`Error finding inventory entry with id ${id}:`, error);
       throw ERRORS.DATABASE_ERROR;
     }
   }
@@ -266,7 +269,7 @@ export class InventoryEntryRepository {
       return entry;
     } catch (error) {
       await connection.rollback();
-      console.error("Error creating inventory entry:", error);
+      logger.error("Error creating inventory entry:", error);
       
       // Preserve specific validation errors
       if (error === ERRORS.INVENTORY_NEGATIVE_QUANTITY_ERROR ||
@@ -364,7 +367,7 @@ export class InventoryEntryRepository {
       return await this.findById(id, req) as InventoryEntry;
     } catch (error) {
       await connection.rollback();
-      console.error(`Error updating inventory entry with id ${id}:`, error);
+      logger.error(`Error updating inventory entry with id ${id}:`, error);
       
       if (error === ERRORS.INVENTORY_ENTRY_NOT_FOUND || 
           error === ERRORS.INVENTORY_NEGATIVE_QUANTITY_ERROR) {
@@ -411,7 +414,7 @@ export class InventoryEntryRepository {
       await connection.commit();
     } catch (error) {
       await connection.rollback();
-      console.error(`Error deleting inventory entry with id ${id}:`, error);
+      logger.error(`Error deleting inventory entry with id ${id}:`, error);
       
       if (error === ERRORS.INVENTORY_ENTRY_NOT_FOUND || 
           error === ERRORS.INVENTORY_NEGATIVE_QUANTITY_ERROR) {
@@ -487,7 +490,7 @@ LEFT JOIN
         total_products: products.length
       };
     } catch (error) {
-      console.error("Error retrieving inventory balance:", error);
+      logger.error("Error retrieving inventory balance:", error);
       throw ERRORS.INVENTORY_BALANCE_RETRIEVAL_FAILED;
     }
   }
@@ -550,7 +553,7 @@ LEFT JOIN
         total
       };
     } catch (error) {
-      console.error(`Error finding inventory entries for product ${productId}:`, error);
+      logger.error(`Error finding inventory entries for product ${productId}:`, error);
       throw ERRORS.DATABASE_ERROR;
     }
   }
@@ -674,7 +677,7 @@ LEFT JOIN
       return { mainEntry, componentEntries };
     } catch (error) {
       await connection.rollback();
-      console.error("Error creating inventory entry with formula components:", error);
+      logger.error("Error creating inventory entry with formula components:", error);
       
       // Preserve specific validation errors
       if (error === ERRORS.INSUFFICIENT_COMPONENT_INVENTORY ||
@@ -758,7 +761,7 @@ LEFT JOIN
         total
       };
     } catch (error) {
-      console.error(`Error getting inventory entries for user ${userId}:`, error);
+      logger.error(`Error getting inventory entries for user ${userId}:`, error);
       
       if (error === ERRORS.USER_NOT_FOUND) {
         throw error;
